@@ -78,7 +78,7 @@ import kagglehub
 path = kagglehub.dataset_download("promptcloud/amazon-product-dataset-2020")
 ```
 
-This resolves to a single CSV, `marketing_sample_for_amazon_com-ecommerce__20200101_20200131__10k_data.csv` — **10,002 products, 28 columns**. We downloaded and inspected it directly (see [Code/data/1.1 explore data.ipynb](Code/data/1.1%20explore%20data.ipynb)); the real schema differs from a generic "id/title/brand/price/rating/features/ingredients" sketch in a few ways worth knowing before building on it. Everything here stays CSV end-to-end — no parquet conversion.
+This resolves to a single CSV, `marketing_sample_for_amazon_com-ecommerce__20200101_20200131__10k_data.csv` — **10,002 products, 28 columns**. We downloaded and inspected it directly (see [Code/1. Data Pipeline & Indexing/1.1 explore data.ipynb](Code/1.%20Data%20Pipeline%20&%20Indexing/1.1%20explore%20data.ipynb)); the real schema differs from a generic "id/title/brand/price/rating/features/ingredients" sketch in a few ways worth knowing before building on it. Everything here stays CSV end-to-end — no parquet conversion.
 
 | Field we need | Actual column | Note |
 |---|---|---|
@@ -93,7 +93,7 @@ This resolves to a single CSV, `marketing_sample_for_amazon_com-ecommerce__20200
 | reviews | — | **no review-level data** — this is a single flat product table, not a products+reviews pair |
 | join key for a 2nd dataset | — | **`Asin` and `Sku` are also 100% empty** — no reliable external key exists; any join would have to be fuzzy, by title |
 
-**13 of the 28 columns are entirely empty** (`Product Description, Stock, Size Quantity Variant, Product Details, Dimensions, Color, Quantity, Ingredients, Asin, Brand Name, Direction To Use, List Price, Sku`) — see [Code/data/processed/column_coverage.csv](Code/data/processed/column_coverage.csv) for the full per-column breakdown.
+**13 of the 28 columns are entirely empty** (`Product Description, Stock, Size Quantity Variant, Product Details, Dimensions, Color, Quantity, Ingredients, Asin, Brand Name, Direction To Use, List Price, Sku`) — see [Code/1. Data Pipeline & Indexing/processed/column_coverage.csv](Code/1.%20Data%20Pipeline%20&%20Indexing/processed/column_coverage.csv) for the full per-column breakdown.
 
 Category distribution is also skewed: **67% Toys & Games**; `Home & Kitchen` (706 rows) and `Sports & Outdoors` (540 rows) are the next largest, while `Household`/`Cleaning` categories total only ~25 rows — too sparse to be the demo slice. **`Home & Kitchen` is the demo category**, composed mainly of kids' bedding, furniture, décor, party supplies, and lunch boxes (only ~7.5% is Kitchen & Dining).
 
@@ -109,32 +109,38 @@ Products are embedded on `Product Name` + `About Product` (+ `Product Specificat
 
 ## Repository Structure
 
+Folders under `Code/` are numbered to match the [task backlog](Project%20Overview/detailed_task_backlog.md)'s own section numbers, so it's always obvious which part of the backlog a given folder implements.
+
 ```
 Project/
-├── Architecture/          # System diagrams (Mermaid)
-├── Code/                  # Implementation (in progress)
-│   └── data/              # exploration/preprocessing/indexing notebooks (CSV in, CSV out — no parquet)
-├── Data/                  # Raw Kaggle download (CSV + zip) — see Data/README.md
-├── Project Overview/      # Project description, team structure, task backlog, data schema & licensing
-├── .env.example           # config template (embeddings, LLM, web-search — see §1.3)
+├── Architecture/                    # System diagrams (Mermaid)
+├── Code/                            # Implementation (in progress)
+│   └── 1. Data Pipeline & Indexing/ # §1 — exploration/preprocessing/indexing notebooks
+│                                     #   (CSV in, CSV out — no parquet)
+├── Data/                            # Raw Kaggle download (CSV + zip) — see Data/README.md
+├── Project Overview/                # Project description, team structure, task backlog, data schema & licensing
+├── .env.example                     # config template (embeddings, LLM, web-search — see §1.3)
 └── README.md
 ```
 
-Planned code layout as implementation lands:
+Planned code layout as implementation lands (folder numbers match backlog sections §2–§6):
 
 ```
 Code/
-├── data/       # ingestion, preprocessing, vector DB indexing
-│   ├── 1.1 explore data.ipynb    # field coverage, price distribution, duplicates, category counts
-│   ├── 1.2 process data.ipynb    # text cleaning, brand/unit extraction, dedup, category flattening
-│   ├── 1.3 build index.ipynb     # embedding + Chroma indexing (2 collections), viz, config-driven
-│   └── processed/                # generated outputs (column_coverage.csv, products_clean.csv,
-│                                  #   chroma_db_home_kitchen/ [committed, ~6.6MB],
-│                                  #   chroma_db_all/ [gitignored, ~65MB — rebuild via 1.3])
-├── graph/      # LangGraph nodes: router, planner, retriever, answerer
-├── tools/      # MCP server + rag.search / web.search implementations
-├── ui/         # Streamlit app
-└── prompts/    # system/tool/router/planner prompts (prompt disclosure)
+├── 1. Data Pipeline & Indexing/
+│   ├── 1.1 explore data.ipynb       # field coverage, price distribution, duplicates, category counts
+│   ├── 1.2 process data.ipynb       # text cleaning, brand/unit extraction, dedup, category flattening
+│   ├── 1.3 build index.ipynb        # embedding + Chroma indexing (2 collections), viz, config-driven
+│   ├── 1.4 hybrid retrieval.ipynb   # vector + metadata search, unit-aware tie-breaking, doc_id citations
+│   ├── 1.5 rag evaluation.ipynb     # precision/recall@5 eval set, failure-case analysis
+│   └── processed/                   # generated outputs (column_coverage.csv, products_clean.csv,
+│                                     #   chroma_db_home_kitchen/ [committed, ~6.6MB],
+│                                     #   chroma_db_all/ [gitignored, ~65MB — rebuild via 1.3])
+├── 2. Agentic Orchestration — LangGraph/   # Router, Planner, Retriever, Answerer/Critic nodes
+├── 3. MCP Server & Tools/                  # MCP server + rag.search / web.search implementations
+├── 4. Speech (ASR + TTS)/                  # Whisper (or comparable) + TTS provider
+├── 5. User Interface/                      # Streamlit app
+└── 6. Prompts & Documentation/              # system/tool/router/planner prompts (prompt disclosure)
 ```
 
 ## Team

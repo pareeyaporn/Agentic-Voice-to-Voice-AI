@@ -1,6 +1,6 @@
 # RAG Evaluation Plan & Results
 
-Covers task backlog §1.5. Full implementation: [Code/data/1.5 rag evaluation.ipynb](../Code/data/1.5%20rag%20evaluation.ipynb) — evaluates [1.4 hybrid retrieval.ipynb](../Code/data/1.4%20hybrid%20retrieval.ipynb)'s `search()`, self-contained, pre-executed.
+Covers task backlog §1.5. Full implementation: [Code/1. Data Pipeline & Indexing/1.5 rag evaluation.ipynb](../Code/1.%20Data%20Pipeline%20&%20Indexing/1.5%20rag%20evaluation.ipynb) — evaluates [1.4 hybrid retrieval.ipynb](../Code/1.%20Data%20Pipeline%20&%20Indexing/1.4%20hybrid%20retrieval.ipynb)'s `search()`, self-contained, pre-executed.
 
 ## Methodology
 
@@ -37,7 +37,7 @@ Recall@5 is mechanically capped by `5 / relevant_total`. A query with 94 relevan
 
 ## Takeaways
 
-- Retrieval quality is genuinely good: 12 of 14 queries hit 0.8+ precision@5, all real vector search against the real index (no query in this eval set was cherry-picked for a good result — see [1.4](../Code/data/1.4%20hybrid%20retrieval.ipynb)'s own separate sanity checks for further confirmation).
+- Retrieval quality is genuinely good: 12 of 14 queries hit 0.8+ precision@5, all real vector search against the real index (no query in this eval set was cherry-picked for a good result — see [1.4](../Code/1.%20Data%20Pipeline%20&%20Indexing/1.4%20hybrid%20retrieval.ipynb)'s own separate sanity checks for further confirmation).
 - The two lowest-precision queries (`"board game for family night"` at 0.60, `"dinosaur toy"` at 0.80) are both against the broader `products_all` catalog, not `products_home_kitchen` — consistent with that collection covering far more diverse content (per §1.3's category-mix findings), giving vector search more room to surface adjacent-but-not-quite matches.
 - Filters work as designed: the `budget_max=15` query correctly narrowed the relevant set and still hit 1.00 precision; the `brand="Wildkin"` query hit 1.00 recall (all 4 ground-truth Wildkin lunch boxes retrieved) confirming the substring-based brand post-filter from §1.4 works despite `brand` being a low-confidence field.
 - No reranker was needed to reach these numbers (confirms the §1.4 decision to skip it for now) — revisit only if a future eval set shows a specific, real gap this doesn't cover.
