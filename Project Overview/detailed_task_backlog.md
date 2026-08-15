@@ -100,7 +100,9 @@ Implementation: [Code/1. Data Pipeline & Indexing/1.2 process data.ipynb](../Cod
 - [ ] Write answerer/critic prompt in `prompts/`
 
 ### 2.6 LLM Provider Abstraction — `CP1`
-- [ ] Config/env-var driven model selection (OpenAI, Anthropic, Gemini, Bedrock, or open-weight)
+- [x] Pick the primary LLM provider — **decided: OpenAI**, using an existing OpenAI API account (no new signup needed). Cheap/fast model tier for the Router/Planner/Answerer nodes (exact model string to be pinned when §2.2–§2.5 are implemented, since OpenAI's lineup shifts). `LLM_PROVIDER=openai` in [.env.example](../.env.example); `OPENAI_API_KEY` already scaffolded there
+- [x] **New dependency:** `langchain-openai` — the LangGraph-side integration package that lets graph nodes call the OpenAI API (the key itself is provider-specific, not LangChain-specific; this package is what wires it into LangGraph nodes). Confirmed with the user before adding, per the project's tech-confirmation convention. Alongside `langgraph` itself (mandated by the assignment, not a discretionary add)
+- [ ] Config/env-var driven model selection (OpenAI, Anthropic, Gemini, Bedrock, or open-weight) — model-agnostic pattern still applies even with OpenAI as the default; swapping providers should only touch `.env`
 - [ ] Confirm tool/function calling works against at least 2 providers to validate swappability
 - [ ] Central prompt/logging wrapper so every node's system prompt + tool I/O is captured (Prompt Disclosure requirement)
 
@@ -114,18 +116,18 @@ Implementation: [Code/1. Data Pipeline & Indexing/1.2 process data.ipynb](../Cod
 ## 3. MCP Server & Tools (`VOICE`)
 
 ### 3.1 Server Skeleton — `CP1`
-- [ ] Stand up `mcp_server.py` with tool discovery (names + JSON schemas)
+- [ ] Stand up the MCP server (project-wide convention is `.ipynb`, not `.py` — see project memory; note this may need revisiting if the server needs to run as a long-lived process rather than execute top-to-bottom once, in which case flag the exception explicitly rather than silently defaulting to `.py`) with tool discovery (names + JSON schemas)
 - [ ] Choose transport (stdio or streamable HTTP/SSE) and document the choice
 - [ ] Health-check / smoke-test entrypoint
 
 ### 3.2 `rag.search` Tool — `CP1` → `CP2`
 - [ ] Define input schema (query, filters: budget/brand/category, top_k)
-- [ ] Define output schema (`sku, title, price, brand?, features, doc_id` — omit `rating`/`ingredients` unless a second source is joined in per §1.1)
-- [ ] Route to `tools/rag_search.py`, which calls the vector DB built in §1.3
+- [ ] Define output schema (`id, title, price, brand?, features, doc_id` — no `sku` (100% empty per §1.1), omit `rating`/`ingredients` unless a second source is joined in)
+- [ ] Route to the retrieval logic already built in [1.4 hybrid retrieval.ipynb](../Code/1.%20Data%20Pipeline%20%26%20Indexing/1.4%20hybrid%20retrieval.ipynb) (`search()`) — this tool wraps that, doesn't reimplement it
 - [ ] Unit tests against a fixture index
 
 ### 3.3 `web.search` Tool — `CP2`
-- [ ] Pick a legitimate web-search API (Brave/Serper/Bing) and get API keys into `.env.example` (never committed)
+- [x] Pick a legitimate web-search API — **decided: Tavily**, not Brave/Serper/Bing (those were the brief's examples, "e.g.," not a required list). Purpose-built for LLM/agent consumption (clean, structured, relevance-ranked results — no scraping/parsing needed); free tier verified at 1,000 credits/month, no credit card (checked live, not assumed); official MCP server exists at [tavily-ai/tavily-mcp](https://github.com/tavily-ai/tavily-mcp) as a reference for tool structure, though per "one server, two tools" this project wraps Tavily's API as our own `web.search` tool inside our own single MCP server rather than running their server standalone. `WEB_SEARCH_PROVIDER`/`TAVILY_API_KEY` in [.env.example](../.env.example)
 - [ ] Define output schema (`title, url, snippet, price?, availability?`)
 - [ ] Implement caching (TTL 60–300s) to avoid redundant calls
 - [ ] Implement rate limiting / backoff
