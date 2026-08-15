@@ -78,26 +78,31 @@ import kagglehub
 path = kagglehub.dataset_download("promptcloud/amazon-product-dataset-2020")
 ```
 
-This resolves to a single CSV, `marketing_sample_for_amazon_com-ecommerce__20200101_20200131__10k_data.csv` — **10,002 products, 28 columns**. We downloaded and inspected it directly; the real schema differs from a generic "products.parquet" sketch in a few ways worth knowing before building on it:
+This resolves to a single CSV, `marketing_sample_for_amazon_com-ecommerce__20200101_20200131__10k_data.csv` — **10,002 products, 28 columns**. We downloaded and inspected it directly (see [Code/data/explore_data.py](Code/data/explore_data.py), runnable via `python3 Code/data/explore_data.py`); the real schema differs from a generic "id/title/brand/price/rating/features/ingredients" sketch in a few ways worth knowing before building on it. Everything here stays CSV end-to-end — no parquet conversion.
 
 | Field we need | Actual column | Note |
 |---|---|---|
-| id | `Uniq Id` | ✅ |
-| title | `Product Name` | ✅ |
-| category | `Category` | ✅ (pipe-delimited hierarchy, e.g. `Home & Kitchen \| ...`) |
-| price | `Selling Price` | use this, not `List Price` (mostly blank) |
-| features | `About Product` | closest match to a feature-bullet field; no column literally named "features" |
-| brand | `Brand Name` | column exists but **empty in 100% of rows** — must be parsed from `Product Name`/`About Product` instead |
-| ingredients | `Ingredients` | column exists but **empty in 100% of rows** — treat as unavailable |
+| id | `Uniq Id` | ✅ 100% populated, zero duplicates — the real primary key |
+| title | `Product Name` | ✅ 100% populated, but 137 duplicate values — dedupe in preprocessing |
+| category | `Category` | 91.7% populated (pipe-delimited hierarchy, e.g. `Home & Kitchen \| ...`); ~8% of rows have no category |
+| price | `Selling Price` | 98.9% non-null, but only 95.2% parse to a clean number; use this, not `List Price` (**0% populated**) |
+| features | `About Product` | 97.3% populated; closest match to a feature-bullet field, no column literally named "features" |
+| brand | — | `Brand Name` column exists but is **empty in 100% of rows** — must be parsed from `Product Name`/`About Product` instead |
+| ingredients | — | `Ingredients` column exists but is **empty in 100% of rows** — treat as unavailable |
 | rating | — | **no rating/stars field exists anywhere in this file** |
 | reviews | — | **no review-level data** — this is a single flat product table, not a products+reviews pair |
+| join key for a 2nd dataset | — | **`Asin` and `Sku` are also 100% empty** — no reliable external key exists; any join would have to be fuzzy, by title |
 
-Category distribution is also skewed: **67% Toys & Games**; `Home & Kitchen` (708 rows) and `Sports & Outdoors` (540 rows) are the next largest, while `Household`/`Cleaning` categories total only ~25 rows — too sparse to be the demo slice. **`Home & Kitchen` is the recommended demo category** instead of Household Cleaning.
+**13 of the 28 columns are entirely empty** (`Product Description, Stock, Size Quantity Variant, Product Details, Dimensions, Color, Quantity, Ingredients, Asin, Brand Name, Direction To Use, List Price, Sku`) — see [Code/data/processed/column_coverage.csv](Code/data/processed/column_coverage.csv) for the full per-column breakdown.
+
+Category distribution is also skewed: **67% Toys & Games**; `Home & Kitchen` (~710 rows) and `Sports & Outdoors` (540 rows) are the next largest, while `Household`/`Cleaning` categories total only ~25 rows — too sparse to be the demo slice. **`Home & Kitchen` is the recommended demo category** instead of Household Cleaning.
 
 Practical implications:
-- Star ratings can't be cited in answers/UI unless a second dataset (e.g. the same publisher's Amazon reviews dataset) is joined in on ASIN/SKU — otherwise drop rating from the pitch and UI.
+- Star ratings can't be cited in answers/UI unless a second dataset is fuzzy-joined by title (no ASIN/SKU key exists here) — otherwise drop rating from the pitch and UI.
 - Brand should be extracted via regex/LLM parsing from `Product Name`, not read from `Brand Name`.
-- "Ingredients" won't be populated for most products; don't design retrieval filters that assume it is.
+- "Ingredients" won't be populated for any products; don't design retrieval filters that assume it is.
+
+Full writeup of the schema decision and licensing (CC0 Public Domain): [Project Overview/data_schema_and_licensing.md](Project%20Overview/data_schema_and_licensing.md).
 
 Products are embedded on `Product Name` + `About Product` (+ `Product Specification`/`Technical Details` if useful) and indexed for hybrid retrieval; prices are unit-normalized where package size is available, for fair comparison.
 
@@ -107,7 +112,9 @@ Products are embedded on `Product Name` + `About Product` (+ `Product Specificat
 Project/
 ├── Architecture/          # System diagrams (Mermaid)
 ├── Code/                  # Implementation (in progress)
-├── Project Overview/      # Project description, team structure & task breakdown
+│   └── data/              # exploration/preprocessing/indexing scripts (CSV in, CSV out — no parquet)
+├── Data/                  # Raw Kaggle download (CSV + zip) — see Data/README.md
+├── Project Overview/      # Project description, team structure, task backlog, data schema & licensing
 └── README.md
 ```
 
@@ -116,6 +123,8 @@ Planned code layout as implementation lands:
 ```
 Code/
 ├── data/       # ingestion, preprocessing, vector DB indexing
+│   ├── explore_data.py        # field coverage, price distribution, duplicates, category counts
+│   └── processed/              # generated outputs (e.g. column_coverage.csv, products_clean.csv)
 ├── graph/      # LangGraph nodes: router, planner, retriever, answerer
 ├── tools/      # MCP server + rag.search / web.search implementations
 ├── ui/         # Streamlit app

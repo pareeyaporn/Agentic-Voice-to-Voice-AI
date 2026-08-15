@@ -12,16 +12,18 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 ### 1.1 Acquisition & Exploration — `CP1`
 - [x] Download Amazon Product Dataset 2020 via `kagglehub.dataset_download("promptcloud/amazon-product-dataset-2020")` — resolves to `marketing_sample_for_amazon_com-ecommerce__20200101_20200131__10k_data.csv`, 10,002 rows × 28 columns (verified 2026-08-15)
 - [x] Confirmed real column set: `Uniq Id, Product Name, Brand Name, Asin, Category, Upc Ean Code, List Price, Selling Price, Quantity, Model Number, About Product, Product Specification, Technical Details, Shipping Weight, Product Dimensions, Image, Variants, Sku, Product Url, Stock, Product Details, Dimensions, Color, Ingredients, Direction To Use, Is Amazon Seller, Size Quantity Variant, Product Description`
-- [ ] **Known data gaps (confirmed by direct inspection, plan around these):**
-  - `Brand Name` and `Ingredients` columns exist but are **empty in 100% of the 10,002 rows** — do not rely on them being populated
-  - **No rating/stars column exists at all** — the "4.6★ rating" in the brief's example interaction is not backed by this dataset; either drop rating from the pitch/UI or join in a second ratings source
-  - **No review-level data** (no `reviews.parquet` equivalent) — this is a single flat product table, not a products+reviews pair
-  - Category distribution is skewed: ~67% `Toys & Games`; `Home & Kitchen` (708 rows) and `Sports & Outdoors` (540 rows) are the next largest; `Household`/`Cleaning` categories total only ~25 rows combined — **too sparse to use as the demo slice**
-- [ ] Pick category slice sized for a demo (~500+ products) — **recommend `Home & Kitchen`** instead of Household Cleaning given actual row counts
-- [ ] Exploratory notebook: field coverage/nulls per column, price distribution (`Selling Price`), duplicate ASINs
-- [ ] Decide final working schema given the gaps above: `products.parquet` (id ← `Uniq Id`, title ← `Product Name`, category ← `Category`, price ← `Selling Price`, features ← `About Product`); brand parsed from text, no rating/ingredients columns unless backfilled from another source
-- [ ] Document data licensing/usage constraints in `Project Overview/` (dataset is CC0 Public Domain per Kaggle listing)
-- [ ] (Optional, if rating/reviews are wanted) Evaluate a second PromptCloud/Kaggle dataset to join in ratings or review snippets by ASIN/SKU
+- [x] **Known data gaps (confirmed by running [Code/data/explore_data.py](../Code/data/explore_data.py) against the full 10,002-row CSV — broader than the initial hand check):**
+  - **13 of 28 columns are 100% empty**, not just 2: `Product Description, Stock, Size Quantity Variant, Product Details, Dimensions, Color, Quantity, Ingredients, Asin, Brand Name, Direction To Use, List Price, Sku`
+  - **`Asin` and `Sku` are both entirely empty** — there is no reliable external product key to join a second dataset on; any join (e.g. for ratings) would have to be fuzzy, by title, not authoritative
+  - **No rating/stars column exists at all** — the "4.6★ rating" in the brief's example interaction is not backed by this dataset; either drop rating from the pitch/UI or fuzzy-join a second ratings source
+  - **No review-level data** — this is a single flat product table, not a products+reviews pair
+  - `Category` is only 91.7% populated (830 blank rows); `Selling Price` is 98.9% non-null but only 95.2% parse to a clean number; `Product Name` has 137 duplicate values
+  - Category distribution is skewed: ~67% `Toys & Games`; `Home & Kitchen` (708–712 rows) and `Sports & Outdoors` (540 rows) are the next largest; `Household`/`Cleaning` categories total only ~25 rows combined — **too sparse to use as the demo slice**
+- [x] Pick category slice sized for a demo (~500+ products) — **decided: `Home & Kitchen`** (708–712 rows) instead of Household Cleaning, given actual row counts
+- [x] Exploratory script (CSV in, CSV out — no parquet, per project convention): [Code/data/explore_data.py](../Code/data/explore_data.py) — field coverage/nulls per column, price distribution (`Selling Price`), duplicate check (`Asin`/`Uniq Id`/`Product Name`), category distribution. Run with `python3 Code/data/explore_data.py`; writes [Code/data/processed/column_coverage.csv](../Code/data/processed/column_coverage.csv)
+- [x] Decide final working schema given the gaps above — see [data_schema_and_licensing.md](data_schema_and_licensing.md) for the full `products_clean.csv` field mapping
+- [x] Document data licensing/usage constraints — see [data_schema_and_licensing.md](data_schema_and_licensing.md) (CC0 Public Domain)
+- [ ] (Optional, if rating/reviews are wanted) Evaluate a second PromptCloud/Kaggle dataset to fuzzy-join in ratings or review snippets by title (no `Asin`/`Sku` available as a clean join key)
 
 ### 1.2 Preprocessing — `CP1`
 - [ ] Clean text fields (strip HTML, normalize whitespace/encoding) in `Product Name`, `About Product`, `Product Description`
@@ -29,7 +31,7 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 - [ ] Normalize units for fair comparison where package size is parseable (e.g. price per oz/count)
 - [ ] Deduplicate near-identical listings (same ASIN/title variants)
 - [ ] Flatten/parse the pipe-delimited `Category` hierarchy into usable filter fields
-- [ ] Persist cleaned `products.parquet` to `Code/data/processed/` (no `reviews.parquet` unless a second data source is added per §1.1)
+- [ ] Persist cleaned `products_clean.csv` to `Code/data/processed/` (no reviews file — none exists for this dataset, per §1.1)
 
 ### 1.3 Embedding & Indexing — `CP1` → `CP2`
 - [ ] Choose embedding model (must be swappable via config, consistent with model-agnostic LLM requirement)
