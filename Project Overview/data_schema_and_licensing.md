@@ -54,8 +54,6 @@ This is a bigger gap than initially scanned by hand — 13 of 28 columns are dea
 
 No `reviews.csv` — there is no review-level data in this dataset at all.
 
-### Recommended demo category slice
+### Demo category slice
 
-**`Home & Kitchen`** — 708–712 rows depending on match method (top-level split vs. substring match), the largest well-formed slice after `Toys & Games` (which dominates at 67% of the dataset). `Household`/`Cleaning` combined is only ~25 rows — confirmed too sparse to use, as flagged earlier.
-
-**Update from §1.3 (indexing):** `Home & Kitchen` turned out to be kids'-goods-heavy, not cookware-heavy. Of the 706 rows actually indexed, the sub-category breakdown is Home Décor (198), Furniture (195, mostly Kids' Furniture), Bedding (177, mostly Kids' Bedding), Event & Party Supplies (72), and Kitchen & Dining (53, mostly lunch boxes/snack bags, not cookware). Searching the full 9,930-row cleaned dataset confirms this is a dataset-wide gap, not a category-filter artifact: "frying pan"/"skillet" return zero matches anywhere, "coffee maker" returns one. **No slice of this dataset supports the assignment brief's "eco-friendly stainless-steel cleaner" example.** Project decision: reframe the demo pitch around what the data actually contains (kids' lunch boxes, bedding, furniture, storage, party supplies) rather than sourcing a different dataset. See [Code/data/1.3 build index.ipynb](../Code/data/1.3%20build%20index.ipynb) for the investigation and verified-good retrieval results against the reframed queries.
+**`Home & Kitchen`** — 706 rows (post-dedup), the largest well-formed slice after `Toys & Games` (67% of the dataset). `Household`/`Cleaning` combined is only ~25 rows — too sparse to use. Composition: Home Décor (198), Furniture (195, mostly Kids'), Bedding (177, mostly Kids'), Event & Party Supplies (72), Kitchen & Dining (53) — kids'-goods-heavy overall. Full investigation: [detailed_task_backlog.md](detailed_task_backlog.md) §1.3.
