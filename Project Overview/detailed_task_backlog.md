@@ -12,7 +12,7 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 ### 1.1 Acquisition & Exploration — `CP1`
 - [x] Download Amazon Product Dataset 2020 via `kagglehub.dataset_download("promptcloud/amazon-product-dataset-2020")` — resolves to `marketing_sample_for_amazon_com-ecommerce__20200101_20200131__10k_data.csv`, 10,002 rows × 28 columns (verified 2026-08-15)
 - [x] Confirmed real column set: `Uniq Id, Product Name, Brand Name, Asin, Category, Upc Ean Code, List Price, Selling Price, Quantity, Model Number, About Product, Product Specification, Technical Details, Shipping Weight, Product Dimensions, Image, Variants, Sku, Product Url, Stock, Product Details, Dimensions, Color, Ingredients, Direction To Use, Is Amazon Seller, Size Quantity Variant, Product Description`
-- [x] **Known data gaps (confirmed by running [Code/data/explore_data.ipynb](../Code/data/explore_data.ipynb) against the full 10,002-row CSV — broader than the initial hand check):**
+- [x] **Known data gaps (confirmed by running [Code/data/1.1 explore data.ipynb](../Code/data/1.1%20explore%20data.ipynb) against the full 10,002-row CSV — broader than the initial hand check):**
   - **13 of 28 columns are 100% empty**, not just 2: `Product Description, Stock, Size Quantity Variant, Product Details, Dimensions, Color, Quantity, Ingredients, Asin, Brand Name, Direction To Use, List Price, Sku`
   - **`Asin` and `Sku` are both entirely empty** — there is no reliable external product key to join a second dataset on; any join (e.g. for ratings) would have to be fuzzy, by title, not authoritative
   - **No rating/stars column exists at all** — the "4.6★ rating" in the brief's example interaction is not backed by this dataset; either drop rating from the pitch/UI or fuzzy-join a second ratings source
@@ -20,18 +20,20 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
   - `Category` is only 91.7% populated (830 blank rows); `Selling Price` is 98.9% non-null but only 95.2% parse to a clean number; `Product Name` has 137 duplicate values
   - Category distribution is skewed: ~67% `Toys & Games`; `Home & Kitchen` (708–712 rows) and `Sports & Outdoors` (540 rows) are the next largest; `Household`/`Cleaning` categories total only ~25 rows combined — **too sparse to use as the demo slice**
 - [x] Pick category slice sized for a demo (~500+ products) — **decided: `Home & Kitchen`** (708–712 rows) instead of Household Cleaning, given actual row counts
-- [x] Exploratory notebook (CSV in, CSV out — no parquet, per project convention): [Code/data/explore_data.ipynb](../Code/data/explore_data.ipynb) — field coverage/nulls per column, price distribution (`Selling Price`), duplicate check (`Asin`/`Uniq Id`/`Product Name`), category distribution, plus charts (field-coverage bar, price-distribution histogram, category-distribution bar) for all three; self-contained and pre-executed with real output. Writes [Code/data/processed/column_coverage.csv](../Code/data/processed/column_coverage.csv)
+- [x] Exploratory notebook (CSV in, CSV out — no parquet, per project convention): [Code/data/1.1 explore data.ipynb](../Code/data/1.1%20explore%20data.ipynb) — field coverage/nulls per column, price distribution (`Selling Price`), duplicate check (`Asin`/`Uniq Id`/`Product Name`), category distribution, plus charts (field-coverage bar, price-distribution histogram, category-distribution bar) for all three; self-contained and pre-executed with real output. Writes [Code/data/processed/column_coverage.csv](../Code/data/processed/column_coverage.csv)
 - [x] Decide final working schema given the gaps above — see [data_schema_and_licensing.md](data_schema_and_licensing.md) for the full `products_clean.csv` field mapping
 - [x] Document data licensing/usage constraints — see [data_schema_and_licensing.md](data_schema_and_licensing.md) (CC0 Public Domain)
 - [ ] (Optional, if rating/reviews are wanted) Evaluate a second PromptCloud/Kaggle dataset to fuzzy-join in ratings or review snippets by title (no `Asin`/`Sku` available as a clean join key)
 
 ### 1.2 Preprocessing — `CP1`
-- [ ] Clean text fields (strip HTML, normalize whitespace/encoding) in `Product Name`, `About Product`, `Product Description`
-- [ ] Extract brand from `Product Name`/`About Product` text (regex or LLM extraction) since `Brand Name` is unpopulated
-- [ ] Normalize units for fair comparison where package size is parseable (e.g. price per oz/count)
-- [ ] Deduplicate near-identical listings (same ASIN/title variants)
-- [ ] Flatten/parse the pipe-delimited `Category` hierarchy into usable filter fields
-- [ ] Persist cleaned `products_clean.csv` to `Code/data/processed/` (no reviews file — none exists for this dataset, per §1.1)
+- [x] Clean text fields (strip HTML, unescape entities, normalize unicode, collapse whitespace) in `Product Name`, `About Product`, `Technical Details`, `Product Specification` (`Product Description` is 100% empty per §1.1, nothing to clean there)
+- [x] Extract brand from `Product Name` text since `Brand Name` is unpopulated — regex heuristic (explicit `"<Line> by <Brand>"` pattern first, then a capped 2-word leading-capitalized-word-run fallback). **Honest quality note:** ~96% coverage, but coverage ≠ accuracy — a hand-reviewed sample puts exact matches around 5/12, ~5/12 correct-prefix-plus-noise, ~2/12 wrong/undercaptured. Treat as a low-confidence signal for coarse grouping, not something to cite. LLM-based extraction would do better if brand precision is ever needed downstream.
+- [x] Normalize units for fair comparison where package size is parseable (price per oz/ml/lb/kg/g/ct from a title regex) — found in ~10% of rows; most titles don't state a package size
+- [x] Deduplicate near-identical listings — no `Asin`/`Sku` key exists (§1.1), so dedupe on exact `Product Name` match; removed duplicate-title rows (10,002 → 9,930)
+- [x] Flatten/parse the pipe-delimited `Category` hierarchy into `category_top` + `category_full` filter fields
+- [x] Persist cleaned `products_clean.csv` to `Code/data/processed/` (no reviews file — none exists for this dataset, per §1.1)
+
+Implementation: [Code/data/1.2 process data.ipynb](../Code/data/1.2%20process%20data.ipynb) — self-contained, pre-executed, builds on [1.1 explore data.ipynb](../Code/data/1.1%20explore%20data.ipynb)'s findings, plus charts (brand-extraction method breakdown, package-size unit distribution, price-per-unit distribution). Output: [Code/data/processed/products_clean.csv](../Code/data/processed/products_clean.csv) (9,930 rows × 13 columns).
 
 ### 1.3 Embedding & Indexing — `CP1` → `CP2`
 - [ ] Choose embedding model (must be swappable via config, consistent with model-agnostic LLM requirement)

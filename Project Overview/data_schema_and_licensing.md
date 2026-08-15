@@ -1,6 +1,6 @@
 # Data Schema Decision & Licensing
 
-Closes out the remaining §1.1 items in [detailed_task_backlog.md](detailed_task_backlog.md) — final working schema and licensing/usage constraints — based on [Code/data/explore_data.ipynb](../Code/data/explore_data.ipynb) run against the actual downloaded CSV.
+Closes out the remaining §1.1 items in [detailed_task_backlog.md](detailed_task_backlog.md) — final working schema and licensing/usage constraints — based on [Code/data/1.1 explore data.ipynb](../Code/data/1.1%20explore%20data.ipynb) run against the actual downloaded CSV.
 
 ## Licensing / usage constraints
 
@@ -12,7 +12,7 @@ Closes out the remaining §1.1 items in [detailed_task_backlog.md](detailed_task
 
 ## Final working schema
 
-Ground truth from [Code/data/explore_data.ipynb](../Code/data/explore_data.ipynb) against the 10,002-row CSV (see full field-coverage table in [Code/data/processed/column_coverage.csv](../Code/data/processed/column_coverage.csv)):
+Ground truth from [Code/data/1.1 explore data.ipynb](../Code/data/1.1%20explore%20data.ipynb) against the 10,002-row CSV (see full field-coverage table in [Code/data/processed/column_coverage.csv](../Code/data/processed/column_coverage.csv)):
 
 ### Columns that are entirely unusable (100% empty, all 10,002 rows)
 
