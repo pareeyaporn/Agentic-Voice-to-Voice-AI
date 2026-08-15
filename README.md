@@ -1,6 +1,8 @@
 # Agentic Voice-to-Voice AI
 
-A voice-to-voice, multi-agent shopping assistant for e-commerce. Users speak a natural-language product request (e.g. *"I need an eco-friendly stainless-steel cleaner under $15"*), and the system interprets intent, plans a retrieval strategy, grounds its answer in a private product catalog (with optional live web comparison), and replies by voice with cited sources.
+A voice-to-voice, multi-agent shopping assistant for e-commerce. Users speak a natural-language product request (e.g. *"I need an insulated lunch box for my kid under $15"*), and the system interprets intent, plans a retrieval strategy, grounds its answer in a private product catalog (with optional live web comparison), and replies by voice with cited sources.
+
+The assignment brief's own example (*"an eco-friendly stainless-steel cleaner"*) is illustrative, not a mandate — the actual dataset we're using doesn't support it (see [Data](#data) below), so the demo pitch is built around what the data actually contains: kids' bedding, furniture, storage, party supplies, and lunch boxes.
 
 Built for ADSP 32028 — Applied Generative AI: Agents and Multimodal Intelligence.
 
@@ -63,7 +65,7 @@ The [Architecture](Architecture/) folder also has [architecture_comparison.merma
 |---|---|
 | **Agentic Orchestration (LangGraph)** | Router (intent classifier) → Planner (source/field selection) → Retriever (agentic RAG via MCP) → Answerer/Critic (grounded synthesis + safety) |
 | **ASR** | Speech-to-text via Whisper (or comparable); fragment-based (record → transcribe) or streaming |
-| **Agentic RAG** | Hybrid vector + metadata search over the Amazon Product Dataset 2020 (e.g. Home & Kitchen), indexed in FAISS/Chroma |
+| **Agentic RAG** | Hybrid vector + metadata search over the Amazon Product Dataset 2020, Home & Kitchen slice (kids' bedding/furniture/décor/lunch/party goods), indexed in Chroma |
 | **MCP Server** | One server, two tools — `rag.search` (private catalog) and `web.search` (live comparison via Brave/Serper/Bing) — with tool discovery, schemas, caching (TTL 60–300s), and logging |
 | **TTS** | Spoken answer ≤15s, fragment-based or streaming (OpenAI TTS, ElevenLabs, Azure Speech, Amazon Polly, Coqui) |
 | **UI** | Streamlit (or React): mic input, live transcript, agent step log, comparison table, citations, Play-TTS button |
@@ -97,10 +99,13 @@ This resolves to a single CSV, `marketing_sample_for_amazon_com-ecommerce__20200
 
 Category distribution is also skewed: **67% Toys & Games**; `Home & Kitchen` (~710 rows) and `Sports & Outdoors` (540 rows) are the next largest, while `Household`/`Cleaning` categories total only ~25 rows — too sparse to be the demo slice. **`Home & Kitchen` is the recommended demo category** instead of Household Cleaning.
 
+**`Home & Kitchen` itself turned out to be kids'-goods-heavy, not cookware-heavy** — confirmed while sanity-checking the index in §1.3: of 706 rows, the real sub-category breakdown is Home Décor (198), Furniture (195, mostly Kids' Furniture), Bedding (177, mostly Kids' Bedding), Event & Party Supplies (72), and Kitchen & Dining (53, mostly lunch boxes/snack bags, not cookware). Searching the *entire* 9,930-row cleaned dataset confirms this isn't a category-filter problem: "frying pan"/"skillet" return **zero** matches anywhere, "coffee maker" returns **one**. No slice of this dataset supports the assignment brief's "eco-friendly stainless-steel cleaner" example — so the project's demo pitch was reframed around what the data actually contains (kids' lunch boxes, bedding, furniture, storage, party supplies) rather than chasing a different dataset. See [Code/data/1.3 build index.ipynb](Code/data/1.3%20build%20index.ipynb) for the full investigation.
+
 Practical implications:
 - Star ratings can't be cited in answers/UI unless a second dataset is fuzzy-joined by title (no ASIN/SKU key exists here) — otherwise drop rating from the pitch and UI.
 - Brand should be extracted via regex/LLM parsing from `Product Name`, not read from `Brand Name`.
 - "Ingredients" won't be populated for any products; don't design retrieval filters that assume it is.
+- Demo/example queries should target what this data actually has (kids' lunch boxes, bedding, furniture, storage, party supplies), not cookware or cleaning products.
 
 Full writeup of the schema decision and licensing (CC0 Public Domain): [Project Overview/data_schema_and_licensing.md](Project%20Overview/data_schema_and_licensing.md).
 
@@ -112,9 +117,10 @@ Products are embedded on `Product Name` + `About Product` (+ `Product Specificat
 Project/
 ├── Architecture/          # System diagrams (Mermaid)
 ├── Code/                  # Implementation (in progress)
-│   └── data/              # exploration/preprocessing/indexing scripts (CSV in, CSV out — no parquet)
+│   └── data/              # exploration/preprocessing/indexing notebooks (CSV in, CSV out — no parquet)
 ├── Data/                  # Raw Kaggle download (CSV + zip) — see Data/README.md
 ├── Project Overview/      # Project description, team structure, task backlog, data schema & licensing
+├── .env.example           # config template (embeddings, LLM, web-search — see §1.3)
 └── README.md
 ```
 
@@ -123,14 +129,14 @@ Planned code layout as implementation lands:
 ```
 Code/
 ├── data/       # ingestion, preprocessing, vector DB indexing
-│   ├── 1.1 explore data.ipynb      # field coverage, price distribution, duplicates, category counts
-│   ├── 1.2 process data.ipynb   # text cleaning, brand/unit extraction, dedup, category flattening
-│   └── processed/              # generated outputs (column_coverage.csv, products_clean.csv)
+│   ├── 1.1 explore data.ipynb    # field coverage, price distribution, duplicates, category counts
+│   ├── 1.2 process data.ipynb    # text cleaning, brand/unit extraction, dedup, category flattening
+│   ├── 1.3 build index.ipynb     # embedding + Chroma indexing, config-driven, sanity-checked
+│   └── processed/                # generated outputs (column_coverage.csv, products_clean.csv, chroma_db/)
 ├── graph/      # LangGraph nodes: router, planner, retriever, answerer
 ├── tools/      # MCP server + rag.search / web.search implementations
 ├── ui/         # Streamlit app
-├── prompts/    # system/tool/router/planner prompts (prompt disclosure)
-└── .env.example
+└── prompts/    # system/tool/router/planner prompts (prompt disclosure)
 ```
 
 ## Team
