@@ -1,0 +1,15 @@
+graph LR
+    A["🎤 Voice<br/>In"] --> B["ASR"]
+    B --> C["LangGraph"]
+    C --> D["MCP<br/>Server"]
+    D --> E["Data"]
+    E --> F["LLM"]
+    F --> G["TTS"]
+    G --> H["🔊 Voice<br/>Out"]
+
+    style A fill:#4CAF50,color:#fff
+    style H fill:#4CAF50,color:#fff
+    style C fill:#2196F3,color:#fff
+    style D fill:#FF6B6B,color:#fff
+    style B fill:#FF5722,color:#fff
+    style G fill:#FF5722,color:#fff

@@ -1,0 +1,24 @@
+graph LR
+    subgraph before["❌ WITHOUT MCP (Simple)"]
+        A1["LangGraph<br/>graph.py"] -->|Direct Function Call| B1["retrieve()"]
+        B1 --> C1["Chroma DB"]
+
+        style A1 fill:#2196F3,color:#fff
+        style B1 fill:#FF9800,color:#fff
+        style C1 fill:#9C27B0,color:#fff
+    end
+
+    subgraph after["✅ WITH MCP (Required)"]
+        A2["LangGraph<br/>graph.py"] -->|MCP Tool Call| B2["MCP Server<br/>mcp_server.py"]
+        B2 -->|Route to<br/>rag.search| C2["tools/rag_search.py"]
+        B2 -->|Route to<br/>web.search| D2["tools/web_search.py"]
+        C2 --> E2["Chroma DB"]
+        D2 --> F2["Web API"]
+
+        style A2 fill:#2196F3,color:#fff
+        style B2 fill:#FF6B6B,color:#fff,stroke:#000,stroke-width:3px
+        style C2 fill:#9C27B0,color:#fff
+        style D2 fill:#9C27B0,color:#fff
+        style E2 fill:#00BCD4,color:#fff
+        style F2 fill:#00BCD4,color:#fff
+    end
