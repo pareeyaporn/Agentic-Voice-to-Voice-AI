@@ -3,3 +3,8 @@
 __pycache__/
 .ipynb_checkpoints/
 .env
+
+# Full-catalog vector index (~52MB, over GitHub's soft limit) — rebuild it
+# yourself by re-running "Code/data/1.3 build index.ipynb". The much smaller
+# Home & Kitchen demo-slice index (~6.6MB) stays committed.
+Code/data/processed/chroma_db_all/

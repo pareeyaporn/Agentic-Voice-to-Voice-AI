@@ -128,7 +128,9 @@ Code/
 │   ├── 1.1 explore data.ipynb    # field coverage, price distribution, duplicates, category counts
 │   ├── 1.2 process data.ipynb    # text cleaning, brand/unit extraction, dedup, category flattening
 │   ├── 1.3 build index.ipynb     # embedding + Chroma indexing (2 collections), viz, config-driven
-│   └── processed/                # generated outputs (column_coverage.csv, products_clean.csv, chroma_db/)
+│   └── processed/                # generated outputs (column_coverage.csv, products_clean.csv,
+│                                  #   chroma_db_home_kitchen/ [committed, ~6.6MB],
+│                                  #   chroma_db_all/ [gitignored, ~65MB — rebuild via 1.3])
 ├── graph/      # LangGraph nodes: router, planner, retriever, answerer
 ├── tools/      # MCP server + rag.search / web.search implementations
 ├── ui/         # Streamlit app
