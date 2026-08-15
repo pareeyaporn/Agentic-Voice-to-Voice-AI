@@ -59,10 +59,12 @@ Implementation: [Code/data/1.2 process data.ipynb](../Code/data/1.2%20process%20
 - [x] **Collection-agnostic by design** (not in the original checklist, added because it was cheap given §1.3's two-collection setup): `search()` takes a `collection` parameter, defaults to `products_home_kitchen`, works unchanged against `products_all` — demonstrated with a `"remote control car"` query against the full catalog
 
 ### 1.5 RAG Evaluation — `CP2` → `FINAL`
-- [ ] Build a small labeled eval set (10–20 representative queries with expected top products)
-- [ ] Measure precision/recall@k on the eval set
-- [ ] Log failure cases (wrong brand match, missed budget filter, stale price) and iterate
-- [ ] Write up eval methodology + results for the RAG Eval Plan (CP2 deliverable)
+- [x] Build an eval set — **14 queries** (not hand-picked "easy" ones): 10 plain `Home & Kitchen`, 2 with filters (`budget_max`, `brand`), 2 against `products_all`. No human-labeled relevance exists for this dataset, so "expected top products" is a **keyword/substring proxy** on `title` — a real, stated limitation (see below), not gold-standard labels
+- [x] Measure precision/recall@5 — **mean precision@5 = 0.90** (strong — 12/14 queries at 0.8+). **Mean recall@5 = 0.32, but this number is largely a structural artifact**: recall@5 is capped at `5/relevant_total`, so a query with 94 keyword-matches (`"board game for family night"`) can't score above ~0.05 even with a perfect top-5, while one with 6 matches (`"paper plates"`) can hit 0.67. Comparing recall@5 across queries with very different ground-truth sizes isn't meaningful — precision@5 is the informative number here
+- [x] Log failure cases — inspected the two lowest-precision queries with real retrieved-vs-expected titles (not just scores), and found the keyword ground truth itself is imperfect in **both directions**: false negatives (a banner clearly relevant to `"birthday party decorations"` doesn't contain the literal word "party," counted as a miss) and false positives (`"board game"` keyword matches a board-game-themed T-shirt and a dice bag, not actual games, inflating that query's relevant-set denominator)
+- [x] Write up eval methodology + results — **[Project Overview/rag_eval_plan.md](rag_eval_plan.md)** (CP2 deliverable). Implementation: [Code/data/1.5 rag evaluation.ipynb](../Code/data/1.5%20rag%20evaluation.ipynb), self-contained, pre-executed, reuses `search()` from §1.4, no new dependencies
+- [x] **Filters validated by the eval, not just assumed working:** `budget_max=15` query still hit 1.00 precision; `brand="Wildkin"` query hit 1.00 recall (all 4 ground-truth Wildkin items retrieved), confirming the low-confidence-field post-filter approach from §1.4 actually works
+- [x] **Reranker decision revisited and confirmed:** no reranker was needed to reach these precision numbers — the §1.4 decision to skip it stands
 
 ---
 
