@@ -63,7 +63,7 @@ The [Architecture](Architecture/) folder also has [architecture_comparison.merma
 |---|---|
 | **Agentic Orchestration (LangGraph)** | Router (intent classifier) → Planner (source/field selection) → Retriever (agentic RAG via MCP) → Answerer/Critic (grounded synthesis + safety) |
 | **ASR** | Speech-to-text via Whisper (or comparable); fragment-based (record → transcribe) or streaming |
-| **Agentic RAG** | Hybrid vector + metadata search over a curated slice of the Amazon Product Dataset 2020 (e.g. Household Cleaning), indexed in FAISS/Chroma |
+| **Agentic RAG** | Hybrid vector + metadata search over the Amazon Product Dataset 2020 (e.g. Home & Kitchen), indexed in FAISS/Chroma |
 | **MCP Server** | One server, two tools — `rag.search` (private catalog) and `web.search` (live comparison via Brave/Serper/Bing) — with tool discovery, schemas, caching (TTL 60–300s), and logging |
 | **TTS** | Spoken answer ≤15s, fragment-based or streaming (OpenAI TTS, ElevenLabs, Azure Speech, Amazon Polly, Coqui) |
 | **UI** | Streamlit (or React): mic input, live transcript, agent step log, comparison table, citations, Play-TTS button |
@@ -71,12 +71,35 @@ The [Architecture](Architecture/) folder also has [architecture_comparison.merma
 
 ## Data
 
-Primary corpus: **Amazon Product Dataset 2020** (Kaggle).
+Primary corpus: **[Amazon Product Dataset 2020](https://www.kaggle.com/datasets/promptcloud/amazon-product-dataset-2020)** (Kaggle, `promptcloud/amazon-product-dataset-2020`).
 
-- `products.parquet` — id, title, brand, category, price, rating, features, ingredients
-- `reviews.parquet` (optional) — product_id, stars, summary/snippets
+```python
+import kagglehub
+path = kagglehub.dataset_download("promptcloud/amazon-product-dataset-2020")
+```
 
-Products are embedded on title + features + selected review snippets and indexed for hybrid retrieval; prices are unit-normalized (e.g. price per oz) for fair comparison.
+This resolves to a single CSV, `marketing_sample_for_amazon_com-ecommerce__20200101_20200131__10k_data.csv` — **10,002 products, 28 columns**. We downloaded and inspected it directly; the real schema differs from a generic "products.parquet" sketch in a few ways worth knowing before building on it:
+
+| Field we need | Actual column | Note |
+|---|---|---|
+| id | `Uniq Id` | ✅ |
+| title | `Product Name` | ✅ |
+| category | `Category` | ✅ (pipe-delimited hierarchy, e.g. `Home & Kitchen \| ...`) |
+| price | `Selling Price` | use this, not `List Price` (mostly blank) |
+| features | `About Product` | closest match to a feature-bullet field; no column literally named "features" |
+| brand | `Brand Name` | column exists but **empty in 100% of rows** — must be parsed from `Product Name`/`About Product` instead |
+| ingredients | `Ingredients` | column exists but **empty in 100% of rows** — treat as unavailable |
+| rating | — | **no rating/stars field exists anywhere in this file** |
+| reviews | — | **no review-level data** — this is a single flat product table, not a products+reviews pair |
+
+Category distribution is also skewed: **67% Toys & Games**; `Home & Kitchen` (708 rows) and `Sports & Outdoors` (540 rows) are the next largest, while `Household`/`Cleaning` categories total only ~25 rows — too sparse to be the demo slice. **`Home & Kitchen` is the recommended demo category** instead of Household Cleaning.
+
+Practical implications:
+- Star ratings can't be cited in answers/UI unless a second dataset (e.g. the same publisher's Amazon reviews dataset) is joined in on ASIN/SKU — otherwise drop rating from the pitch and UI.
+- Brand should be extracted via regex/LLM parsing from `Product Name`, not read from `Brand Name`.
+- "Ingredients" won't be populated for most products; don't design retrieval filters that assume it is.
+
+Products are embedded on `Product Name` + `About Product` (+ `Product Specification`/`Technical Details` if useful) and indexed for hybrid retrieval; prices are unit-normalized where package size is available, for fair comparison.
 
 ## Repository Structure
 
@@ -103,6 +126,8 @@ Code/
 ## Team
 
 See [team_structure_and_task_breakdown.md](Project%20Overview/team_structure_and_task_breakdown.md) for the full role breakdown, week-by-week critical path, and deliverables checklist.
+
+For the granular, checkable engineering task list (per component, per checkpoint), see [detailed_task_backlog.md](Project%20Overview/detailed_task_backlog.md).
 
 | Role | Owns |
 |---|---|
