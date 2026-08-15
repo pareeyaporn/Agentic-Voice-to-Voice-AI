@@ -78,7 +78,7 @@ import kagglehub
 path = kagglehub.dataset_download("promptcloud/amazon-product-dataset-2020")
 ```
 
-This resolves to a single CSV, `marketing_sample_for_amazon_com-ecommerce__20200101_20200131__10k_data.csv` — **10,002 products, 28 columns**. We downloaded and inspected it directly (see [Code/data/explore_data.py](Code/data/explore_data.py), runnable via `python3 Code/data/explore_data.py`); the real schema differs from a generic "id/title/brand/price/rating/features/ingredients" sketch in a few ways worth knowing before building on it. Everything here stays CSV end-to-end — no parquet conversion.
+This resolves to a single CSV, `marketing_sample_for_amazon_com-ecommerce__20200101_20200131__10k_data.csv` — **10,002 products, 28 columns**. We downloaded and inspected it directly (see [Code/data/explore_data.ipynb](Code/data/explore_data.ipynb)); the real schema differs from a generic "id/title/brand/price/rating/features/ingredients" sketch in a few ways worth knowing before building on it. Everything here stays CSV end-to-end — no parquet conversion.
 
 | Field we need | Actual column | Note |
 |---|---|---|
@@ -123,7 +123,7 @@ Planned code layout as implementation lands:
 ```
 Code/
 ├── data/       # ingestion, preprocessing, vector DB indexing
-│   ├── explore_data.py        # field coverage, price distribution, duplicates, category counts
+│   ├── explore_data.ipynb     # field coverage, price distribution, duplicates, category counts
 │   └── processed/              # generated outputs (e.g. column_coverage.csv, products_clean.csv)
 ├── graph/      # LangGraph nodes: router, planner, retriever, answerer
 ├── tools/      # MCP server + rag.search / web.search implementations
