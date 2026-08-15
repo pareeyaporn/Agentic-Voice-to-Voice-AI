@@ -1,0 +1,51 @@
+graph TD
+    A["🎤 User Voice Input"] -->|Audio File| B["ASR<br/>Whisper<br/>asr.py"]
+
+    B -->|Transcript| C["Streamlit UI<br/>main.py"]
+
+    C -->|Display Query| D["LangGraph<br/>Orchestration<br/>graph.py"]
+
+    D --> E["Router Node<br/>Intent Classifier"]
+    E -->|Parse constraints<br/>budget, material, etc| F["Retriever Node<br/>Call MCP Tools"]
+
+    F -->|Tool Call:<br/>rag.search| G["MCP SERVER<br/>mcp_server.py<br/><br/>Tool Discovery<br/>+ Routing"]
+
+    F -->|Tool Call:<br/>web.search| G
+
+    G -->|Route to implementation<br/>rag.search| H["RAG Search<br/>tools/rag_search.py"]
+    G -->|Route to implementation<br/>web.search| I["Web Search<br/>tools/web_search.py"]
+
+    H -->|Return products| J["Chroma Vector DB<br/>data_index.py"]
+    I -->|Return results| K["Web API<br/>Brave/Serper"]
+
+    J -->|Results| G
+    K -->|Results| G
+
+    G -->|Structured Results| F
+
+    F -->|Products List| L["Answerer Node<br/>Synthesize Response"]
+
+    L -->|Answer + Citations| M["Streamlit UI<br/>Display Results"]
+
+    M -->|Show Table| N["Comparison Table<br/>Title, Price, Rating"]
+    M -->|Show Log| O["Agent Log<br/>What happened<br/>at each node"]
+
+    M -->|Answer Text| P["TTS<br/>OpenAI/ElevenLabs<br/>tts.py"]
+    P -->|Audio Output| Q["🔊 Speaker/Audio Player"]
+
+    Q -->|Play| A
+
+    style A fill:#4CAF50,color:#fff
+    style Q fill:#4CAF50,color:#fff
+    style D fill:#2196F3,color:#fff
+    style E fill:#2196F3,color:#fff
+    style F fill:#2196F3,color:#fff
+    style L fill:#2196F3,color:#fff
+    style C fill:#FF9800,color:#fff
+    style G fill:#FF6B6B,color:#fff,stroke:#000,stroke-width:3px
+    style H fill:#9C27B0,color:#fff
+    style I fill:#9C27B0,color:#fff
+    style P fill:#FF5722,color:#fff
+    style B fill:#FF5722,color:#fff
+    style J fill:#00BCD4,color:#fff
+    style K fill:#00BCD4,color:#fff
