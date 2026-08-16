@@ -5,29 +5,34 @@ graph TD
 
     C -->|Display Query| D["LangGraph<br/>Orchestration<br/>graph.py"]
 
-    D --> E["Router Node<br/>Intent Classifier"]
-    E -->|Parse constraints<br/>budget, material, etc| F["Retriever Node<br/>Call MCP Tools"]
+    D --> E["Router Node<br/>Intent Classifier +<br/>Constraint Extraction"]
 
-    F -->|Tool Call:<br/>rag.search| G["MCP SERVER<br/>mcp_server.py<br/><br/>Tool Discovery<br/>+ Routing"]
+    E -->|safety_flag set| S["Safe-refusal path<br/>skip retrieval entirely"]
+    E -->|safety_flag = None,<br/>constraints extracted| F["Planner Node<br/>Decide rag vs. web sourcing<br/>(no tool calls here)"]
 
-    F -->|Tool Call:<br/>web.search| G
+    F -->|plan: use_rag always,<br/>use_web only if live<br/>price/availability implied| R["Retriever Node<br/>Call MCP Tools per plan"]
 
-    G -->|Route to implementation<br/>rag.search| H["RAG Search<br/>tools/rag_search.py"]
-    G -->|Route to implementation<br/>web.search| I["Web Search<br/>tools/web_search.py"]
+    R -->|Tool Call:<br/>rag.search always| G["MCP SERVER<br/>mcp_server.py<br/><br/>Tool Discovery<br/>+ Routing"]
 
-    H -->|Return products| J["Chroma Vector DB<br/>data_index.py"]
-    I -->|Return results| K["Web API<br/>Brave/Serper"]
+    R -.->|Tool Call:<br/>web.search only if<br/>plan.use_web| G
+
+    G -->|Route to implementation<br/>rag.search| H["RAG Search<br/>tools/rag_search.py<br/>(wraps §1.4 search())"]
+    G -.->|Route to implementation<br/>web.search| I["Web Search<br/>tools/web_search.py<br/>(Tavily)"]
+
+    H -->|Return products| J["Chroma Vector DB<br/>built via<br/>1.3 build index.ipynb"]
+    I -.->|Return results| K["Web API<br/>Tavily"]
 
     J -->|Results| G
-    K -->|Results| G
+    K -.->|Results| G
 
-    G -->|Structured Results| F
+    G -->|Structured Results| R
 
-    F -->|Products List| L["Answerer Node<br/>Synthesize Response"]
+    R -->|Reconciled products<br/>+ conflicts flagged| L["Answerer/Critic Node<br/>Synthesize + ground + cite"]
 
-    L -->|Answer + Citations| M["Streamlit UI<br/>Display Results"]
+    S --> M["Streamlit UI<br/>Display Results"]
+    L -->|Answer + Citations| M
 
-    M -->|Show Table| N["Comparison Table<br/>Title, Price, Rating"]
+    M -->|Show Table| N["Comparison Table<br/>Title, Price, Brand, Features"]
     M -->|Show Log| O["Agent Log<br/>What happened<br/>at each node"]
 
     M -->|Answer Text| P["TTS<br/>OpenAI/ElevenLabs<br/>tts.py"]
@@ -40,7 +45,9 @@ graph TD
     style D fill:#2196F3,color:#fff
     style E fill:#2196F3,color:#fff
     style F fill:#2196F3,color:#fff
+    style R fill:#2196F3,color:#fff
     style L fill:#2196F3,color:#fff
+    style S fill:#f8d7da,color:#000
     style C fill:#FF9800,color:#fff
     style G fill:#FF6B6B,color:#fff,stroke:#000,stroke-width:3px
     style H fill:#9C27B0,color:#fff

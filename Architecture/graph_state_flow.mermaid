@@ -1,17 +1,21 @@
 graph TD
     A["🎤 transcript<br/>(input, from ASR)"] --> B
 
-    B["Router<br/>reads: transcript<br/>writes: query, constraints, safety_flag"]
-    B -->|safety_flag set| C["Safe-refusal path<br/>(skip retrieval)"]
+    B["Router<br/>reads: transcript<br/>writes: query, constraints, safety_flag<br/><i>classifies intent (search / comparison /<br/>follow-up / out-of-scope), extracts<br/>budget / brand / category, flags unsafe asks</i>"]
+    B -->|safety_flag set| C["Safe-refusal path<br/>(skip retrieval entirely)"]
     B -->|safety_flag = None| D
 
-    D["Planner<br/>reads: query, constraints<br/>writes: plan"]
+    D["Planner<br/>reads: query, constraints<br/>writes: plan<br/><i>DECIDES sourcing: plan.use_rag is always true;<br/>plan.use_web is true only if the query implies<br/>live price / availability. No tool calls here.</i>"]
     D --> E
 
-    E["Retriever<br/>reads: plan, constraints<br/>writes: tool_results<br/><i>(calls rag.search / web.search<br/>via MCP — stubbed for now)</i>"]
-    E --> F
+    E["Retriever<br/>reads: plan, constraints<br/>writes: tool_results<br/><i>EXECUTES the Planner's decision (doesn't<br/>make its own) via MCP tool calls</i>"]
+    E -->|plan.use_rag| E1["MCP: rag.search<br/>(private catalog)"]
+    E -->|plan.use_web| E2["MCP: web.search<br/>(live comparison, only if planned)"]
+    E1 --> E3["Reconcile by brand/title,<br/>flag conflicts, log partial failures"]
+    E2 --> E3
+    E3 --> F
 
-    F["Answerer / Critic<br/>reads: tool_results, constraints<br/>writes: citations, final_answer"]
+    F["Answerer / Critic<br/>reads: tool_results, constraints<br/>writes: citations, final_answer<br/><i>grounds the answer in tool_results only,<br/>rejects/rewrites if ungrounded,<br/>enforces the ≤15s spoken-summary limit</i>"]
     F --> G["🔊 final_answer → TTS"]
 
     style A fill:#4CAF50,color:#fff
@@ -21,3 +25,6 @@ graph TD
     style E fill:#2196F3,color:#fff
     style F fill:#2196F3,color:#fff
     style C fill:#f8d7da,color:#000
+    style E1 fill:#9C27B0,color:#fff
+    style E2 fill:#9C27B0,color:#fff
+    style E3 fill:#2196F3,color:#fff

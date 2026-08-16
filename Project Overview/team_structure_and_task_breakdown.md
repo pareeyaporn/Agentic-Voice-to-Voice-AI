@@ -36,7 +36,7 @@
 - Implement Whisper ASR (fragment-based transcription)
 - Build MCP server with two tools: `web.search` & `rag.search`
 - Implement TTS (fragment-based synthesis, OpenAI/ElevenLabs/Coqui)
-- Integrate web-search API (Brave/Serper) with caching
+- Integrate web-search API (decided: Tavily — see [detailed_task_backlog.md](detailed_task_backlog.md) §3.3) with caching
 - Performance & reliability testing (latency, error handling)
 
 **Timeline:** Week 1-10 (tools → polish → stress test)  

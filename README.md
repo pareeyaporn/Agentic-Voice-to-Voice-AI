@@ -24,29 +24,34 @@ graph TD
 
     C -->|Display Query| D["LangGraph<br/>Orchestration<br/>graph.py"]
 
-    D --> E["Router Node<br/>Intent Classifier"]
-    E -->|Parse constraints<br/>budget, material, etc| F["Retriever Node<br/>Call MCP Tools"]
+    D --> E["Router Node<br/>Intent Classifier +<br/>Constraint Extraction"]
 
-    F -->|Tool Call:<br/>rag.search| G["MCP SERVER<br/>mcp_server.py<br/><br/>Tool Discovery<br/>+ Routing"]
+    E -->|safety_flag set| S["Safe-refusal path<br/>skip retrieval entirely"]
+    E -->|safety_flag = None,<br/>constraints extracted| F["Planner Node<br/>Decide rag vs. web sourcing<br/>(no tool calls here)"]
 
-    F -->|Tool Call:<br/>web.search| G
+    F -->|plan: use_rag always,<br/>use_web only if live<br/>price/availability implied| R["Retriever Node<br/>Call MCP Tools per plan"]
 
-    G -->|Route to implementation<br/>rag.search| H["RAG Search<br/>tools/rag_search.py"]
-    G -->|Route to implementation<br/>web.search| I["Web Search<br/>tools/web_search.py"]
+    R -->|Tool Call:<br/>rag.search always| G["MCP SERVER<br/>mcp_server.py<br/><br/>Tool Discovery<br/>+ Routing"]
 
-    H -->|Return products| J["Chroma Vector DB<br/>data_index.py"]
-    I -->|Return results| K["Web API<br/>Brave/Serper"]
+    R -.->|Tool Call:<br/>web.search only if<br/>plan.use_web| G
+
+    G -->|Route to implementation<br/>rag.search| H["RAG Search<br/>tools/rag_search.py<br/>(wraps §1.4 search())"]
+    G -.->|Route to implementation<br/>web.search| I["Web Search<br/>tools/web_search.py<br/>(Tavily)"]
+
+    H -->|Return products| J["Chroma Vector DB<br/>built via<br/>1.3 build index.ipynb"]
+    I -.->|Return results| K["Web API<br/>Tavily"]
 
     J -->|Results| G
-    K -->|Results| G
+    K -.->|Results| G
 
-    G -->|Structured Results| F
+    G -->|Structured Results| R
 
-    F -->|Products List| L["Answerer Node<br/>Synthesize Response"]
+    R -->|Reconciled products<br/>+ conflicts flagged| L["Answerer/Critic Node<br/>Synthesize + ground + cite"]
 
-    L -->|Answer + Citations| M["Streamlit UI<br/>Display Results"]
+    S --> M["Streamlit UI<br/>Display Results"]
+    L -->|Answer + Citations| M
 
-    M -->|Show Table| N["Comparison Table<br/>Title, Price, Rating"]
+    M -->|Show Table| N["Comparison Table<br/>Title, Price, Brand, Features"]
     M -->|Show Log| O["Agent Log<br/>What happened<br/>at each node"]
 
     M -->|Answer Text| P["TTS<br/>OpenAI/ElevenLabs<br/>tts.py"]
@@ -64,7 +69,7 @@ The [Architecture](Architecture/) folder also has [architecture_comparison.merma
 | **Agentic Orchestration (LangGraph)** | Router (intent classifier) → Planner (source/field selection) → Retriever (agentic RAG via MCP) → Answerer/Critic (grounded synthesis + safety) |
 | **ASR** | Speech-to-text via Whisper (or comparable); fragment-based (record → transcribe) or streaming |
 | **Agentic RAG** | Hybrid vector + metadata search over the Amazon Product Dataset 2020, indexed in Chroma as two collections: `products_home_kitchen` (706-row demo slice) and `products_all` (9,930 rows, full catalog) |
-| **MCP Server** | One server, two tools — `rag.search` (private catalog) and `web.search` (live comparison via Brave/Serper/Bing) — with tool discovery, schemas, caching (TTL 60–300s), and logging |
+| **MCP Server** | One server, two tools — `rag.search` (private catalog) and `web.search` (live comparison via Tavily) — with tool discovery, schemas, caching (TTL 60–300s), and logging |
 | **TTS** | Spoken answer ≤15s, fragment-based or streaming (OpenAI TTS, ElevenLabs, Azure Speech, Amazon Polly, Coqui) |
 | **UI** | Streamlit (or React): mic input, live transcript, agent step log, comparison table, citations, Play-TTS button |
 | **LLM** | Model-agnostic — swappable via environment variables/config (OpenAI, Anthropic, Gemini, Bedrock, or open-weight Llama/Mistral/Qwen/Phi) |
@@ -115,15 +120,17 @@ Folders under `Code/` are numbered to match the [task backlog](Project%20Overvie
 Project/
 ├── Architecture/                    # System diagrams (Mermaid)
 ├── Code/                            # Implementation (in progress)
-│   └── 1. Data Pipeline & Indexing/ # §1 — exploration/preprocessing/indexing notebooks
-│                                     #   (CSV in, CSV out — no parquet)
+│   ├── 1. Data Pipeline & Indexing/ # §1 — exploration/preprocessing/indexing notebooks
+│   │                                 #   (CSV in, CSV out — no parquet)
+│   └── 2. Agentic Orchestration/    # §2 — LangGraph state schema + node graph (design started)
 ├── Data/                            # Raw Kaggle download (CSV + zip) — see Data/README.md
 ├── Project Overview/                # Project description, team structure, task backlog, data schema & licensing
 ├── .env.example                     # config template (embeddings, LLM, web-search — see §1.3)
 └── README.md
 ```
 
-Planned code layout as implementation lands (folder numbers match backlog sections §2–§6):
+Code layout as implementation lands (folder numbers match backlog sections §1–§6; §3–§6 are
+still planned, named here for orientation only):
 
 ```
 Code/
@@ -136,11 +143,29 @@ Code/
 │   └── processed/                   # generated outputs (column_coverage.csv, products_clean.csv,
 │                                     #   chroma_db_home_kitchen/ [committed, ~6.6MB],
 │                                     #   chroma_db_all/ [gitignored, ~65MB — rebuild via 1.3])
-├── 2. Agentic Orchestration — LangGraph/   # Router, Planner, Retriever, Answerer/Critic nodes
-├── 3. MCP Server & Tools/                  # MCP server + rag.search / web.search implementations
-├── 4. Speech (ASR + TTS)/                  # Whisper (or comparable) + TTS provider
-├── 5. User Interface/                      # Streamlit app
-└── 6. Prompts & Documentation/              # system/tool/router/planner prompts (prompt disclosure)
+├── 2. Agentic Orchestration/
+│   ├── 2.1-2.6 graph and nodes.ipynb # design/prototyping record (§2.1-2.6, frozen, not
+│   │                                 #   re-synced with the .py files below)
+│   ├── 2.7 testing.ipynb             # imports the real graph.py for real (§2.7) — extraction
+│   │                                 #   sanity checks (free), 1 e2e test, 6-query regression set
+│   ├── config.py                     # REPO_ROOT, .env loading (§2.6)
+│   ├── state.py                      # GraphState/Plan/ToolResults, EMPTY_STATE (§2.1)
+│   ├── providers.py                  # get_chat_model() real branching + invoke_and_log() (§2.6)
+│   ├── router.py                     # Router + safe_refusal nodes (§2.2)
+│   ├── planner.py                    # Planner node, rule-based (§2.3)
+│   ├── retriever.py                  # Retriever node, search() ported from §1.4 (§2.4)
+│   ├── answerer.py                   # Answerer/Critic node (§2.5)
+│   └── graph.py                      # wires the above into the compiled `graph` — this is
+│                                     #   what §2.7 imports today, §5's UI will import later
+├── 3. MCP Server & Tools/           # (planned) MCP server + rag.search / web.search implementations
+├── 4. Speech (ASR + TTS)/           # (planned) Whisper (or comparable) + TTS provider
+├── 5. User Interface/               # (planned) Streamlit app
+└── 6. Prompts & Documentation/
+    ├── router_system_prompt.md          # Router's system prompt (§6 Prompt Disclosure)
+    ├── planner_rules.md                 # Planner's rule + rationale (not an LLM prompt — §2.3
+    │                                     #   explains why)
+    └── answerer_critic_system_prompt.md # Answerer/Critic's system prompt. Retriever (§2.4)
+                                          #   has no prompt of its own — no LLM call in that node
 ```
 
 ## Team
