@@ -1,0 +1,23 @@
+graph TD
+    A["🎤 transcript<br/>(input, from ASR)"] --> B
+
+    B["Router<br/>reads: transcript<br/>writes: query, constraints, safety_flag"]
+    B -->|safety_flag set| C["Safe-refusal path<br/>(skip retrieval)"]
+    B -->|safety_flag = None| D
+
+    D["Planner<br/>reads: query, constraints<br/>writes: plan"]
+    D --> E
+
+    E["Retriever<br/>reads: plan, constraints<br/>writes: tool_results<br/><i>(calls rag.search / web.search<br/>via MCP — stubbed for now)</i>"]
+    E --> F
+
+    F["Answerer / Critic<br/>reads: tool_results, constraints<br/>writes: citations, final_answer"]
+    F --> G["🔊 final_answer → TTS"]
+
+    style A fill:#4CAF50,color:#fff
+    style G fill:#4CAF50,color:#fff
+    style B fill:#2196F3,color:#fff
+    style D fill:#2196F3,color:#fff
+    style E fill:#2196F3,color:#fff
+    style F fill:#2196F3,color:#fff
+    style C fill:#f8d7da,color:#000

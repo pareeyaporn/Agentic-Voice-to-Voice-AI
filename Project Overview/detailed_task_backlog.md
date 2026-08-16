@@ -5,6 +5,8 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 **Legend — Owner:** `ORCH` Orchestration Lead · `DATA` Data Engineer · `VOICE` Voice/Integration Engineer · `UI` Frontend/UI Engineer · `LEAD` Project Lead
 **Legend — Checkpoint:** `CP1` Week 6 · `CP2` Week 8 · `FINAL` Week 10
 
+**File format convention:** default to `.ipynb` everywhere a notebook can do the job (see project memory — this is a hard preference, not a style note). Use `.py` only where a notebook genuinely can't: a long-running server process (§3.1 MCP server), a framework-mandated entrypoint (§5.1 Streamlit's `streamlit run app.py`), or a module one of those running `.py` processes must `import` at query time (importing code from a live `.ipynb` isn't practical). Every `.py` file planned below should trace to one of these three reasons, not a default.
+
 ---
 
 ## 1. Data Pipeline & Indexing (`DATA`)
@@ -74,6 +76,7 @@ Implementation: [Code/1. Data Pipeline & Indexing/1.2 process data.ipynb](../Cod
 - [ ] Define graph state schema (query, transcript, constraints, plan, tool results, citations, safety flags, final answer)
 - [ ] Sketch node graph: Router → Planner → Retriever → Answerer/Critic (matches [architecture_with_mcp.mermaid](../Architecture/architecture_with_mcp.mermaid))
 - [ ] Decide conditional edges (e.g. skip web.search unless query implies "current/latest/now")
+- [ ] **File format note:** design/prototyping can happen in a notebook, but the graph the live UI actually calls per query must be an importable `.py` module (reason (c) in the file-format convention above — the Streamlit app has to `import` it at query time, not re-execute a notebook). Design here, export/finalize as `.py` once the UI (§5) needs to call it.
 
 ### 2.2 Router Node — `CP1` → `CP2`
 - [ ] Intent classification: is this a product search/comparison/follow-up/out-of-scope query?
@@ -88,7 +91,7 @@ Implementation: [Code/1. Data Pipeline & Indexing/1.2 process data.ipynb](../Cod
 
 ### 2.4 Retriever Node (Agentic RAG) — `CP2`
 - [ ] Call MCP tools only (no direct DB/API calls) per [architecture_with_mcp.mermaid](../Architecture/architecture_with_mcp.mermaid)
-- [ ] Reconcile `rag.search` vs `web.search` results by SKU/brand/title similarity
+- [ ] Reconcile `rag.search` vs `web.search` results by brand/title similarity (not SKU — 100% empty per §1.1, same fix already applied to §3.2's output schema)
 - [ ] Flag and log conflicts (e.g. live price disagrees with catalog price) rather than silently picking one
 - [ ] Handle partial failures gracefully (one tool times out/errors, continue with the other)
 
@@ -116,11 +119,12 @@ Implementation: [Code/1. Data Pipeline & Indexing/1.2 process data.ipynb](../Cod
 ## 3. MCP Server & Tools (`VOICE`)
 
 ### 3.1 Server Skeleton — `CP1`
-- [ ] Stand up the MCP server (project-wide convention is `.ipynb`, not `.py` — see project memory; note this may need revisiting if the server needs to run as a long-lived process rather than execute top-to-bottom once, in which case flag the exception explicitly rather than silently defaulting to `.py`) with tool discovery (names + JSON schemas)
+- [ ] Stand up the MCP server — long-running process, so `.py` per the file-format convention above (reason (a): not a notebook-appropriate one-shot execution) — with tool discovery (names + JSON schemas)
 - [ ] Choose transport (stdio or streamable HTTP/SSE) and document the choice
 - [ ] Health-check / smoke-test entrypoint
 
 ### 3.2 `rag.search` Tool — `CP1` → `CP2`
+- [ ] **File format note:** the tool implementation lives in a `.py` module the §3.1 server imports at request time (reason (c)) — not a notebook. It wraps §1.4's `search()` logic rather than re-deriving it.
 - [ ] Define input schema (query, filters: budget/brand/category, top_k)
 - [ ] Define output schema (`id, title, price, brand?, features, doc_id` — no `sku` (100% empty per §1.1), omit `rating`/`ingredients` unless a second source is joined in)
 - [ ] Route to the retrieval logic already built in [1.4 hybrid retrieval.ipynb](../Code/1.%20Data%20Pipeline%20%26%20Indexing/1.4%20hybrid%20retrieval.ipynb) (`search()`) — this tool wraps that, doesn't reimplement it
@@ -145,14 +149,14 @@ Implementation: [Code/1. Data Pipeline & Indexing/1.2 process data.ipynb](../Cod
 ## 4. Speech (ASR + TTS) (`VOICE`)
 
 ### 4.1 ASR — `CP1` → `CP2`
-- [ ] Implement `asr.py` using Whisper (or comparable) — fragment-based (record → transcribe) first
+- [ ] Implement `asr.py` using Whisper (or comparable) — `.py` per the file-format convention above (reason (c): the UI imports this at query time) — fragment-based (record → transcribe) first
 - [ ] Support WAV/MP3 input from the UI's mic capture
 - [ ] Return transcript (+ timestamps if available)
 - [ ] Basic accent/multilingual smoke test
 - [ ] (Stretch) streaming ASR if time allows
 
 ### 4.2 TTS — `CP2`
-- [ ] Implement `tts.py`; make provider swappable (OpenAI TTS/Realtime, ElevenLabs, Azure, Polly, Coqui)
+- [ ] Implement `tts.py` — `.py` per the file-format convention above (reason (c): the UI imports this at query time); make provider swappable (OpenAI TTS/Realtime, ElevenLabs, Azure, Polly, Coqui)
 - [ ] Enforce ≤15s output aligned with the Answerer node's summary
 - [ ] Fragment-based synthesis (generate full audio, then play) first; streaming as stretch goal
 - [ ] Handle synthesis failures with a text-only fallback in the UI
@@ -167,7 +171,7 @@ Implementation: [Code/1. Data Pipeline & Indexing/1.2 process data.ipynb](../Cod
 ## 5. User Interface (`UI`)
 
 ### 5.1 Scaffold — `CP1`
-- [ ] Streamlit (or React) app skeleton: mic capture (record/upload) → send file to ASR
+- [ ] Streamlit (or React) app skeleton: mic capture (record/upload) → send file to ASR — `.py` per the file-format convention above (reason (b): `streamlit run` requires a `.py` entrypoint, not a notebook)
 - [ ] Mock-data mode so UI work is unblocked before the graph/tools are ready
 
 ### 5.2 Core Flow — `CP2`
