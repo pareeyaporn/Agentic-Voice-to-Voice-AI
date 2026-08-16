@@ -22,12 +22,14 @@ fabricated scenarios:
 - material/quantity are dropped client-side -- the MCP tool's schema
   doesn't declare those parameters at all, so forwarding them would be a
   validation error, not a graceful no-op
-- **Known gap, not solved here:** web products get `doc_id=None` (they
-  only have a `url`, no private-catalog doc_id) -- Answerer's citation
-  schema and prompt are doc_id-first, so a web result is unlikely to
-  actually get cited even though it's present in tool_results.products.
-  Reworking Answerer's citation model to handle both is a real follow-up,
-  not attempted as part of this swap.
+- web products get `doc_id=None` (they only have a `url`, no private-catalog
+  doc_id) -- this used to be a known gap ("Answerer's citation schema is
+  doc_id-first, a web result is unlikely to actually get cited"), since
+  resolved: Answerer's citation model (answerer.py) now cites by a generic
+  `ref` -- doc_id for rag, url for web -- resolved to the right source by
+  looking the ref up against real products, not by trusting the LLM to
+  self-classify. `doc_id=None` here is exactly what makes that resolve to
+  `source: "web"` instead of `"rag"`.
 """
 
 import os

@@ -33,7 +33,7 @@ class GraphState(TypedDict):
     safety_flag: Optional[str]  # Router: reason string, or None
     plan: Plan  # Planner: sourcing decision
     tool_results: ToolResults  # Retriever: reconciled MCP results
-    citations: List[Dict[str, str]]  # Answerer: doc_id/url per claim
+    citations: List[Dict[str, Any]]  # Answerer: {source, doc_id, url, title} per claim -- doc_id/url are exclusive per source (rag/web)
     final_answer: Optional[str]  # Answerer: spoken-summary text
 
 

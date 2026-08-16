@@ -159,10 +159,13 @@ Code/
 │   ├── mcp_client.py                 # persistent MCP client (the Retriever swap) — starts
 │   │                                 #   Code/3. MCP Server & Tools/mcp_server.py once, reuses
 │   │                                 #   one ClientSession across queries, not per-query
-│   ├── answerer.py                   # Answerer/Critic node (§2.5) — grounding, length, AND
-│   │                                 #   raw-doc_id-leak all enforced deterministically, not
-│   │                                 #   trusted to the prompt alone (the last one was a real,
-│   │                                 #   ~40%-reproducible bug caught after the swap, not assumed)
+│   ├── answerer.py                   # Answerer/Critic node (§2.5) — grounding, length, and
+│   │                                 #   raw-ref-leak all enforced deterministically, not
+│   │                                 #   trusted to the prompt alone. Cites by a generic `ref`
+│   │                                 #   (doc_id for rag, url for web), resolved to
+│   │                                 #   source/doc_id/url by lookup, never trusted from the
+│   │                                 #   LLM's own claim — what makes citations "clearly
+│   │                                 #   distinguished" (§5.2) actually possible
 │   └── graph.py                      # wires the above into the compiled `graph` (async since
 │                                     #   the swap — invoke via `await graph.ainvoke(...)`) —
 │                                     #   what §2.7 imports today, §5's UI will import later
