@@ -1,0 +1,36 @@
+# Consolidated from every notebook's own pip-install cell + every .py file's
+# imports (see README.md's "Getting Started" section for the run order).
+# Install with: pip install -r requirements.txt
+
+# --- §1 Data Pipeline & Indexing ---
+pandas
+numpy
+matplotlib
+scikit-learn          # PCA/t-SNE visualization only (1.3 build index.ipynb)
+sentence-transformers  # local embeddings (all-MiniLM-L6-v2)
+chromadb
+python-dotenv
+
+# --- §2 Agentic Orchestration ---
+langgraph
+langchain-core
+langchain-openai       # only the openai provider path is exercised;
+# langchain-anthropic / langchain-google-genai / langchain-aws are written to
+# the same interface (providers.py get_chat_model()) but untested here --
+# uncomment only if you switch LLM_PROVIDER away from openai
+# langchain-anthropic
+# langchain-google-genai
+# langchain-aws
+pydantic
+
+# --- §3 MCP Server & Tools ---
+mcp                    # official Model Context Protocol SDK
+tavily-python
+
+# --- §4 Speech (ASR + TTS) ---
+faster-whisper
+openai
+
+# --- §5 User Interface ---
+streamlit
+streamlit-mic-recorder

@@ -187,14 +187,14 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 
 ## 6. Prompts & Documentation (split across the 4 roles)
 
-- [ ] `prompts/` folder + Prompt Disclosure mapping — `ORCH`
-- [ ] Root `README.md` kept in sync — `UI`
-- [ ] `.env.example` kept in sync — `UI`, populated by whoever adds a dependency
-- [ ] Data write-up — `DATA`
-- [ ] Graph design write-up — `ORCH`
-- [ ] MCP write-up (reuses §3.4 README) — `VOICE`
-- [ ] Safety notes — `ORCH` (refusal behavior) + `VOICE` (domain allowlist/ToS)
-- [ ] Setup/run scripts — `UI`
+- [x] `prompts/` folder + Prompt Disclosure mapping — `ORCH` — [Code/6. Prompts & Documentation/](../Code/6.%20Prompts%20%26%20Documentation/) has all 3 prompts; each node's `.py` docstring names its own prompt file
+- [x] Root `README.md` kept in sync — `UI`
+- [x] `.env.example` kept in sync — `UI`, populated by whoever adds a dependency
+- [x] Data write-up — `DATA` — [data_schema_and_licensing.md](data_schema_and_licensing.md)
+- [x] Graph design write-up — `ORCH` — README's Architecture section + [graph_state_flow.mermaid](../Architecture/graph_state_flow.mermaid)
+- [x] MCP write-up (reuses §3.4 README) — `VOICE`
+- [x] Safety notes — `ORCH` (refusal behavior, documented in router.py) + `VOICE` (domain allowlist/ToS, in the MCP README)
+- [x] Setup/run scripts — `UI` — [requirements.txt](../requirements.txt) + README's "Getting Started"
 
 ---
 
@@ -211,11 +211,11 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 ### Checkpoint 2 — Week 8
 - [x] Architecture diagram — [architecture_with_mcp.mermaid](../Architecture/architecture_with_mcp.mermaid)
 - [x] UI with live graph integration — real, not a wireframe
-- [ ] RAG eval plan
+- [x] RAG eval plan — [rag_eval_plan.md](rag_eval_plan.md)
 - [x] MCP README
 - [x] LangGraph working end-to-end (real, not mocked)
 - [x] ASR/TTS/web.search functional and wired into the UI
-- [ ] `.env.example` + setup instructions
+- [x] `.env.example` + setup instructions — [requirements.txt](../requirements.txt), README's "Getting Started"
 
 ### Final — Week 10
 - [ ] Live demo ≤7 min
