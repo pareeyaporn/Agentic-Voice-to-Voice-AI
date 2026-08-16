@@ -2,7 +2,7 @@
 
 Granular, checkable task list for building the Agentic Voice-to-Voice AI assistant. Complements [team_structure_and_task_breakdown.md](team_structure_and_task_breakdown.md) (who owns what, at a role level) with the actual engineering tasks each role needs to complete, grouped by component, each tagged with owner and target checkpoint.
 
-**Legend — Owner:** `ORCH` Orchestration Lead · `DATA` Data Engineer · `VOICE` Voice/Integration Engineer · `UI` Frontend/UI Engineer · `LEAD` Project Lead
+**Legend — Owner:** `ORCH` Orchestration Lead · `DATA` Data Engineer · `VOICE` Voice/Integration Engineer · `UI` Frontend/UI Engineer. 4-person team, no separate Project Lead — see [team_structure_and_task_breakdown.md](team_structure_and_task_breakdown.md) for how former Project Lead duties (docs/coordination) are folded into these 4 roles.
 **Legend — Checkpoint:** `CP1` Week 6 · `CP2` Week 8 · `FINAL` Week 10
 
 **File format convention:** default to `.ipynb` everywhere a notebook can do the job (see project memory — this is a hard preference, not a style note). Use `.py` only where a notebook genuinely can't: a long-running server process (§3.1 MCP server), a framework-mandated entrypoint (§5.1 Streamlit's `streamlit run app.py`), or a module one of those running `.py` processes must `import` at query time (importing code from a live `.ipynb` isn't practical). Every `.py` file planned below should trace to one of these three reasons, not a default.
@@ -218,17 +218,17 @@ Implementation: [Code/1. Data Pipeline & Indexing/1.2 process data.ipynb](../Cod
 
 ---
 
-## 6. Prompts & Documentation (`LEAD`, with input from `ORCH`)
+## 6. Prompts & Documentation (split across all 4 roles — no separate `LEAD`, see the note above)
 
-- [ ] Create `prompts/` folder: router, planner, retriever/reconciliation, answerer/critic system prompts + any few-shot examples
-- [ ] Map each prompt to the graph node/tool that uses it (Prompt Disclosure grading requirement)
-- [ ] `README.md` — keep in sync as components land (installation, running, troubleshooting) — *root README already scaffolded*
-- [ ] `.env.example` — every required env var (LLM provider keys, web-search API key, model name/config) with no real secrets
-- [ ] Data preprocessing & indexing write-up
-- [ ] Graph design write-up (nodes, state schema, edges)
-- [ ] MCP server/tool schema write-up (can reuse §3.4 README)
-- [ ] Safety notes (domain allowlist, robots.txt/ToS stance, refusal behavior for unsafe queries)
-- [ ] Setup/run scripts (`make index`, `make server`, `make ui`, or equivalent)
+- [ ] Create `prompts/` folder: router, planner, retriever/reconciliation, answerer/critic system prompts + any few-shot examples — `ORCH`
+- [ ] Map each prompt to the graph node/tool that uses it (Prompt Disclosure grading requirement) — `ORCH`
+- [ ] `README.md` — keep in sync as components land (installation, running, troubleshooting) — *root README already scaffolded* — `UI` (final assembly point; every other role updates the sections closest to their own work as they land, per the pattern already followed through §1-§5)
+- [ ] `.env.example` — every required env var (LLM provider keys, web-search API key, model name/config) with no real secrets — `UI` owns the file, each role adds their own section's vars as built (already how §1/§2/§3/§4 populated it)
+- [ ] Data preprocessing & indexing write-up — `DATA`
+- [ ] Graph design write-up (nodes, state schema, edges) — `ORCH`
+- [ ] MCP server/tool schema write-up (can reuse §3.4 README) — `VOICE`
+- [ ] Safety notes (domain allowlist, robots.txt/ToS stance, refusal behavior for unsafe queries) — `ORCH` (refusal behavior) + `VOICE` (domain allowlist/ToS)
+- [ ] Setup/run scripts (`make index`, `make server`, `make ui`, or equivalent) — `UI`
 
 ---
 

@@ -234,13 +234,16 @@ See [team_structure_and_task_breakdown.md](Project%20Overview/team_structure_and
 
 For the granular, checkable engineering task list (per component, per checkpoint), see [detailed_task_backlog.md](Project%20Overview/detailed_task_backlog.md).
 
+4-person team, no separate Project Lead — coordination/documentation duties are folded into
+the 4 roles below (see [team_structure_and_task_breakdown.md](Project%20Overview/team_structure_and_task_breakdown.md)
+for the full reasoning).
+
 | Role | Owns |
 |---|---|
-| Orchestration Lead | LangGraph pipeline, routing logic, prompts, conflict resolution |
-| Data Engineer | Data pipeline, vector DB indexing, hybrid retrieval, RAG eval |
-| Voice/Integration Engineer | ASR, TTS, MCP server, web-search tool, performance testing |
-| Frontend/UI Engineer | Streamlit app, audio I/O, comparison table, UX |
-| Project Lead | Coordination, docs, prompt disclosure, presentation |
+| Orchestration Lead | LangGraph pipeline, routing logic, prompts, conflict resolution, `prompts/` folder + prompt disclosure, graph design write-up, safety notes |
+| Data Engineer | Data pipeline, vector DB indexing, hybrid retrieval, RAG eval, data write-up |
+| Voice/Integration Engineer | ASR, TTS, MCP server, web-search tool, performance testing, MCP README |
+| Frontend/UI Engineer | Streamlit app, audio I/O, comparison table, UX, root README, `.env.example`, demo/presentation |
 
 ## Milestones
 
