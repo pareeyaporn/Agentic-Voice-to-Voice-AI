@@ -157,7 +157,21 @@ Code/
 │   ├── answerer.py                   # Answerer/Critic node (§2.5)
 │   └── graph.py                      # wires the above into the compiled `graph` — this is
 │                                     #   what §2.7 imports today, §5's UI will import later
-├── 3. MCP Server & Tools/           # (planned) MCP server + rag.search / web.search implementations
+├── 3. MCP Server & Tools/            # README.md inside covers this section in full
+│   ├── mcp_server.py                  # server (§3.1) — stdio transport, registers both tools,
+│   │                                  #   both wrapped in @logged_tool (§3.4)
+│   ├── rag_search_tool.py             # rag.search implementation (§3.2) — wraps §2.4's
+│   │                                  #   retriever.py search() against the real committed index
+│   ├── web_search_tool.py             # web.search implementation (§3.3) — Tavily via
+│   │                                  #   tavily-python, caching, backoff, domain allowlist
+│   ├── tool_logging.py                # cross-cutting (§3.4): logging, secret scrubbing,
+│   │                                  #   typed ToolError contract, applied to both tools
+│   ├── 3.1 server skeleton smoke test.ipynb    # real subprocess + stdio round-trip test
+│   ├── 3.2 rag search tool test.ipynb           # real subprocess + stdio, 4 cases against
+│   │                                            #   the real index (no fixture index built)
+│   ├── 3.3 web search tool test.ipynb            # 1 real Tavily call (via real MCP server)
+│   │                                             #   + 6 mocked cases (caching/backoff/allowlist)
+│   └── 3.4 cross-cutting test.ipynb               # logging/scrubbing/typed-error tests
 ├── 4. Speech (ASR + TTS)/           # (planned) Whisper (or comparable) + TTS provider
 ├── 5. User Interface/               # (planned) Streamlit app
 └── 6. Prompts & Documentation/
@@ -167,6 +181,11 @@ Code/
     └── answerer_critic_system_prompt.md # Answerer/Critic's system prompt. Retriever (§2.4)
                                           #   has no prompt of its own — no LLM call in that node
 ```
+
+**§3 status:** 3.1–3.4 all done. Known gap, tracked not hidden: Retriever (§2.4) still
+calls `search()` directly rather than through this server — see
+[Code/3. MCP Server & Tools/README.md](Code/3.%20MCP%20Server%20%26%20Tools/README.md)
+for the planned swap.
 
 ## Team
 
