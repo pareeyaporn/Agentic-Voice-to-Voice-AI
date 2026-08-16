@@ -35,7 +35,7 @@ import io
 import wave
 from dataclasses import dataclass
 
-from config import TTS_MAX_SECONDS, TTS_MODEL, TTS_PROVIDER, TTS_VOICE
+from speech_config import TTS_MAX_SECONDS, TTS_MODEL, TTS_PROVIDER, TTS_VOICE
 
 _client = None  # lazy singleton, same reasoning as asr.py's _model
 

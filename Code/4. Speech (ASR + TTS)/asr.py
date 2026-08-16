@@ -17,7 +17,7 @@ import os
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from config import ASR_COMPUTE_TYPE, ASR_DEVICE, ASR_MODEL_SIZE
+from speech_config import ASR_COMPUTE_TYPE, ASR_DEVICE, ASR_MODEL_SIZE
 
 _model = None  # lazy-loaded, process-wide singleton: model load (~seconds)
 # is the expensive part, so it happens once per process, not once per call --

@@ -1,11 +1,18 @@
 """
 Shared config for the speech package (§4 ASR + TTS).
 
-Own config.py rather than importing §2's -- ASR/TTS config (model size,
+Own config module rather than importing §2's -- ASR/TTS config (model size,
 device, compute type, voice) is a disjoint concern from LLM provider config;
 the only thing worth sharing is the same __file__-based path-resolution +
 load_dotenv pattern §2's config.py already established, which is cheap to
 just repeat here.
+
+Named `speech_config.py`, not `config.py` -- both this directory and §2's
+have their own config module; §5's UI imports from both in one process, and
+a bare `import config` from each would silently collide (the second import
+just returns whichever module Python already cached under that name, not
+the intended one) -- a real bug caught by testing that combined import
+before writing the UI, not a hypothetical worry.
 """
 
 import os

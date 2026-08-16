@@ -20,7 +20,7 @@ Orchestration is a LangGraph pipeline. Every retrieval path — private catalog 
 graph TD
     A["🎤 User Voice Input"] -->|Audio File| B["ASR<br/>Whisper<br/>asr.py"]
 
-    B -->|Transcript| C["Streamlit UI<br/>main.py"]
+    B -->|Transcript| C["Streamlit UI<br/>app.py"]
 
     C -->|Display Query| D["LangGraph<br/>Orchestration<br/>graph.py"]
 
@@ -188,8 +188,12 @@ Code/
 │   │                                             #   + 6 mocked cases (caching/backoff/allowlist)
 │   └── 3.4 cross-cutting test.ipynb               # logging/scrubbing/typed-error tests
 ├── 4. Speech (ASR + TTS)/
-│   ├── config.py                       # own config.py (ASR/TTS are a disjoint concern from
-│   │                                    #   §2's LLM config) — ASR_*/TTS_* env vars, .env loading
+│   ├── speech_config.py                 # own config module (ASR/TTS are a disjoint concern
+│   │                                    #   from §2's LLM config) — ASR_*/TTS_* env vars, .env
+│   │                                    #   loading. Named speech_config.py, not config.py —
+│   │                                    #   §5's UI imports from both §2 and §4 in one process,
+│   │                                    #   and two same-named bare `config` modules would
+│   │                                    #   silently collide (caught by testing that import)
 │   ├── asr.py                          # transcribe() (§4.1) — local faster-whisper, lazy
 │   │                                    #   process-wide singleton model, typed ASRError
 │   ├── tts.py                          # synthesize() (§4.2) — OpenAI TTS, deterministic <=15s
@@ -199,7 +203,18 @@ Code/
 │   └── 4.1-4.2 speech smoke test.ipynb # real TTS->ASR round trip, budget-correction case
 │                                        #   exercised for real, multilingual smoke test
 │                                        #   (synthesized audio, stated limitation), error paths
-├── 5. User Interface/               # (planned) Streamlit app
+├── 5. User Interface/
+│   ├── app.py                        # Streamlit entrypoint (§5.1-5.2) — mic recorder
+│   │                                  #   (streamlit-mic-recorder) + file-upload + type-text
+│   │                                  #   input, editable transcript, agent step log (via
+│   │                                  #   graph.astream()), comparison table, citations +
+│   │                                  #   data lineage, Play-TTS button, mock-data mode
+│   └── async_runtime.py              # sync<->async bridge — one persistent background
+│                                      #   event-loop thread for the process's whole life, so
+│                                      #   §2.4's persistent MCP session survives across
+│                                      #   Streamlit reruns (verified directly: same
+│                                      #   ClientSession object id() across separate
+│                                      #   run_async() calls, 2nd call ~3x faster than the 1st)
 └── 6. Prompts & Documentation/
     ├── router_system_prompt.md          # Router's system prompt (§6 Prompt Disclosure)
     ├── planner_rules.md                 # Planner's rule + rationale (not an LLM prompt — §2.3
@@ -237,7 +252,7 @@ For the granular, checkable engineering task list (per component, per checkpoint
 
 ## Status
 
-🚧 In progress — §1 (Data Pipeline & Indexing), §2 (Agentic Orchestration), §3 (MCP Server & Tools), and §4 (Speech: ASR + TTS) are implemented and tested; §5 (User Interface) has not started.
+🚧 In progress — §1 (Data Pipeline & Indexing), §2 (Agentic Orchestration), §3 (MCP Server & Tools), §4 (Speech: ASR + TTS) are implemented and tested; §5 (User Interface) scaffold + core flow (§5.1-5.2) are wired end-to-end and tested, polish (§5.3) not started.
 
 ## License
 
