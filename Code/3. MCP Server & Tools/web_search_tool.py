@@ -56,6 +56,10 @@ _cache: dict[tuple, tuple[float, dict]] = {}
 
 MAX_RETRIES = 3
 BACKOFF_BASE_SECONDS = 0.5
+# §4.3: tavily-python's own default is timeout=60s per call -- with 3 retries
+# that's a 180s worst case for one web.search call. 15s is enough for a
+# normal Tavily response and keeps a live demo's worst case bounded.
+REQUEST_TIMEOUT_SECONDS = 15
 
 _PRICE_RE = re.compile(r"\$\s?(\d{1,4}(?:\.\d{2})?)")
 _OUT_OF_STOCK_WORDS = ("out of stock", "sold out", "unavailable", "no longer available")
@@ -87,7 +91,9 @@ def _call_with_backoff(query: str, max_results: int) -> dict:
     last_error = None
     for attempt in range(MAX_RETRIES):
         try:
-            return _get_client().search(query, max_results=max_results, include_domains=ALLOWED_DOMAINS)
+            return _get_client().search(
+                query, max_results=max_results, include_domains=ALLOWED_DOMAINS, timeout=REQUEST_TIMEOUT_SECONDS
+            )
         except TavilyTimeoutError as e:
             last_error = ToolError("timeout", str(e))
             if attempt < MAX_RETRIES - 1:

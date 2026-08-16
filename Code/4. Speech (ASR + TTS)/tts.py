@@ -43,7 +43,9 @@ def _get_client():
     if _client is None:
         from openai import OpenAI
 
-        _client = OpenAI()
+        # §4.3: bounded timeout -- the SDK's own default is 600s, which would
+        # leave the UI's spinner running for up to 10 minutes on a hung call.
+        _client = OpenAI(timeout=30.0, max_retries=1)
     return _client
 
 

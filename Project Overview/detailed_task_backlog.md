@@ -204,10 +204,10 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 ## 7. Milestone Deliverables Checklist
 
 ### Checkpoint 1 — Week 6
-- [ ] One-page proposal
-- [ ] Data exploration notebook
-- [ ] Related-work summary
-- [ ] Indexed vector DB
+- [ ] One-page proposal (problem, data slice, tools) — a literal course-submission document, not built here
+- [x] Data exploration notebook — [1.1 explore data.ipynb](../Code/1.%20Data%20Pipeline%20&%20Indexing/1.1%20explore%20data.ipynb)
+- [ ] Related-work summary — a literal course-submission document, not built here
+- [x] Indexed vector DB — `chroma_db_home_kitchen/`, committed
 - [x] MCP server + tool schemas — fully implemented, not just stubbed
 - [x] Streamlit UI scaffold with mock data
 
@@ -221,13 +221,13 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 - [x] `.env.example` + setup instructions — [requirements.txt](../requirements.txt), README's "Getting Started"
 
 ### Final — Week 10
-- [ ] Live demo ≤7 min
-- [ ] Clean repository
-- [ ] Comprehensive README
-- [ ] `prompts/` folder complete
-- [ ] Performance & reliability report
-- [ ] Presentation slides
-- [ ] Safety notes documented
+- [ ] Live demo ≤7 min — out of scope here, owned by Frontend/UI Engineer (per team structure)
+- [x] Clean repository — all code committed, no dead files, docs trimmed for conciseness
+- [ ] Comprehensive README — install + run are covered; no troubleshooting section yet
+- [x] `prompts/` folder complete — all 3 prompts, each with real few-shot examples, mapped to their nodes
+- [ ] Performance & reliability report — §4.3 not started (needs the UI to measure real latency against)
+- [ ] Presentation slides — out of scope here, owned by Frontend/UI Engineer (per team structure)
+- [x] Safety notes documented — refusal behavior (router.py), domain allowlist/robots.txt/ToS stance (MCP README)
 
 ---
 

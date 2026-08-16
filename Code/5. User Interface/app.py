@@ -218,6 +218,10 @@ def run_query(query: str, mock: bool) -> None:
                          "and loads the local embedding model -- slower once, fast after)..."):
             try:
                 final_state, step_log = async_runtime.run_async(_run_graph_streamed(query))
+            except TimeoutError:
+                st.error(f"This is taking longer than expected (>{async_runtime.DEFAULT_TIMEOUT_SECONDS}s) "
+                         "and may have stalled -- try again, or try a simpler query.")
+                return
             except Exception as e:  # graph/MCP/LLM failure -- surfaced, not swallowed
                 st.error(f"Something went wrong running the assistant: {e}")
                 return
