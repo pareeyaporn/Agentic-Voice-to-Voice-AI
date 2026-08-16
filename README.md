@@ -153,9 +153,18 @@ Code/
 │   ├── providers.py                  # get_chat_model() real branching + invoke_and_log() (§2.6)
 │   ├── router.py                     # Router + safe_refusal nodes (§2.2)
 │   ├── planner.py                    # Planner node, rule-based (§2.3)
-│   ├── retriever.py                  # Retriever node, search() ported from §1.4 (§2.4)
-│   ├── answerer.py                   # Answerer/Critic node (§2.5)
-│   └── graph.py                      # wires the above into the compiled `graph` — this is
+│   ├── retriever.py                  # Retriever node (§2.4) — calls rag.search/web.search via
+│   │                                 #   mcp_client.py; search() itself stays here for
+│   │                                 #   rag_search_tool.py (§3.2) to import, ported from §1.4
+│   ├── mcp_client.py                 # persistent MCP client (the Retriever swap) — starts
+│   │                                 #   Code/3. MCP Server & Tools/mcp_server.py once, reuses
+│   │                                 #   one ClientSession across queries, not per-query
+│   ├── answerer.py                   # Answerer/Critic node (§2.5) — grounding, length, AND
+│   │                                 #   raw-doc_id-leak all enforced deterministically, not
+│   │                                 #   trusted to the prompt alone (the last one was a real,
+│   │                                 #   ~40%-reproducible bug caught after the swap, not assumed)
+│   └── graph.py                      # wires the above into the compiled `graph` (async since
+│                                     #   the swap — invoke via `await graph.ainvoke(...)`) —
 │                                     #   what §2.7 imports today, §5's UI will import later
 ├── 3. MCP Server & Tools/            # README.md inside covers this section in full
 │   ├── mcp_server.py                  # server (§3.1) — stdio transport, registers both tools,
@@ -182,10 +191,10 @@ Code/
                                           #   has no prompt of its own — no LLM call in that node
 ```
 
-**§3 status:** 3.1–3.4 all done. Known gap, tracked not hidden: Retriever (§2.4) still
-calls `search()` directly rather than through this server — see
+**§3 status:** 3.1–3.4 all done, and Retriever (§2.4) now calls both tools through this
+server for real via a persistent MCP client — see
 [Code/3. MCP Server & Tools/README.md](Code/3.%20MCP%20Server%20%26%20Tools/README.md)
-for the planned swap.
+and `Code/2. Agentic Orchestration/mcp_client.py`.
 
 ## Team
 

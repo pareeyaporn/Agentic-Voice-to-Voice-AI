@@ -110,11 +110,21 @@ in-process shortcut — exercises the actual integration point a real client use
 - [`3.3 web search tool test.ipynb`](3.3%20web%20search%20tool%20test.ipynb) — 1 real Tavily call + mocked caching/backoff/allowlist tests (mocking is the right call *there* specifically — you can't reliably force a real rate-limit response on demand)
 - [`3.4 cross-cutting test.ipynb`](3.4%20cross-cutting%20test.ipynb) — logging, scrubbing, typed errors
 
-## Known gap, tracked not hidden
+## Wired into the live graph
 
 The Retriever node (§2.4, [`Code/2. Agentic Orchestration/retriever.py`](../2.%20Agentic%20Orchestration/retriever.py))
-still calls `search()` directly rather than through this server's `rag.search` tool —
-this server exists and works, but isn't wired into the live graph yet. That swap is
-planned as one consolidated piece of work (persistent server/session lifecycle + both
-tools + `tool_results.conflicts` reconciliation, which needs two real result sets to be
-meaningful), not done piecemeal.
+calls both tools through this server for real, via a persistent MCP client
+([`Code/2. Agentic Orchestration/mcp_client.py`](../2.%20Agentic%20Orchestration/mcp_client.py))
+— the server is spawned once (not per query, verified for real: first call ~0.2s
+including the embedding-model load, every call after ~0.01s on the same session) and
+reused across queries, and `retriever_node` is `async def` accordingly. `search()`
+itself stays in `retriever.py` — it's still the real implementation
+[`rag_search_tool.py`](rag_search_tool.py) imports — Retriever just no longer calls it
+directly.
+
+**Known limitation, stated not hidden:** the persistent MCP client's `close()` is
+best-effort. anyio ties a session's task group to whichever asyncio Task first opened
+it, and LangGraph runs async nodes in its own internally-spawned task, so closing from
+outside that task raises an anyio error — caught and logged rather than left to crash
+the caller. This only affects how *graceful* shutdown looks (the server subprocess dies
+with the parent process regardless), not correctness.

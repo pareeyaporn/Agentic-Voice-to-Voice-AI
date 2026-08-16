@@ -14,6 +14,12 @@ nodes). See Architecture/graph_state_flow.mermaid.
 
 This module is what a real importer (§2.7's testing notebook, and eventually
 §5's Streamlit UI) imports -- see the design notebook's file-format note.
+
+**Invoke with `await graph.ainvoke(...)`, not `graph.invoke(...)`** -- since
+the Retriever swap, retriever_node is async (it calls MCP tools through a
+persistent client, mcp_client.py). LangGraph runs mixed sync/async nodes in
+one graph fine (verified directly, not assumed), but the whole graph has to
+be driven with the async entrypoint once any node is async.
 """
 
 from typing import Literal

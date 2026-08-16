@@ -3,11 +3,11 @@ MCP server skeleton (§3.1). Long-running process, so `.py` per the file-format
 convention (reason (a): not a notebook-appropriate one-shot execution).
 
 One server, two tools -- `rag.search` and `web.search` -- per the project's
-architecture (Architecture/architecture_with_mcp.mermaid). Both real now:
+architecture (Architecture/architecture_with_mcp.mermaid). Both real:
 `rag.search` (§3.2, rag_search_tool.py, wraps §1.4/§2.4's search()) and
-`web.search` (§3.3, web_search_tool.py, Tavily). Retriever (§2.4) still
-calls `search()` directly rather than through this server -- that swap is
-an explicit follow-up decision, not done yet.
+`web.search` (§3.3, web_search_tool.py, Tavily). Retriever (§2.4) calls both
+through this server for real now, via a persistent MCP client
+(Code/2. Agentic Orchestration/mcp_client.py) -- spawned once, not per query.
 
 Transport: stdio, not streamable HTTP/SSE. This server is spawned as a local
 subprocess by the same process running the LangGraph app (Retriever node),

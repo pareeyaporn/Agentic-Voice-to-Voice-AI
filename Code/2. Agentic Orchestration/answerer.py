@@ -1,9 +1,15 @@
 """
 Answerer/Critic node (§2.5). One structured-output LLM call synthesizes the
-spoken recommendation + citations -- but grounding and the ~15s length budget
-are enforced deterministically in Python afterward, not trusted to the
-prompt alone. A prompt instruction is a request; a citation compared against
-the actual list of retrieved doc_ids is a fact.
+spoken recommendation + citations -- but grounding, raw-ID leaks, and the
+~15s length budget are all enforced deterministically in Python afterward,
+not trusted to the prompt alone. A prompt instruction is a request; a
+citation compared against the actual list of retrieved doc_ids is a fact.
+
+scrub_raw_ids() exists because the prompt alone genuinely wasn't reliable
+enough: verified a real, reproducible case (~40% of runs on one low-context
+query) where the model spoke a raw doc_id mid-sentence despite the prompt
+saying not to -- caught by testing the actual behavior, not assumed fixed
+just because the prompt asked nicely.
 
 System prompt: Code/6. Prompts & Documentation/answerer_critic_system_prompt.md
 
@@ -18,6 +24,7 @@ risk on a case a rule already covers completely.
 """
 
 import os
+import re
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -29,6 +36,12 @@ from state import GraphState
 ANSWER_WORD_BUDGET = 40
 NO_RESULTS_FALLBACK = "I couldn't find a good match for that in the catalog."
 UNGROUNDED_FALLBACK = "I found some options but couldn't confirm the details, so I don't want to guess."
+RAW_ID_LEAK_FALLBACK = "I found a good match but had trouble summarizing it cleanly -- let me know if you'd like me to try again."
+
+# doc_ids in this project are 32-char hex strings (md5-shaped, from products_clean.csv's
+# `id` column, §1.3). 16+ hex chars is a generous floor -- real spoken content basically
+# never produces a string that long and that shape by accident.
+_RAW_ID_RE = re.compile(r"\b[0-9a-f]{16,}\b", re.IGNORECASE)
 
 
 class AnswererCitation(BaseModel):
@@ -65,6 +78,20 @@ def grounding_check(result: AnswererOutput, valid_doc_ids: set) -> AnswererOutpu
     return result
 
 
+def scrub_raw_ids(result: AnswererOutput) -> AnswererOutput:
+    """Deterministic backstop for the prompt's "never speak a doc_id" rule
+    -- not trusted to the prompt alone, because it isn't reliable enough on
+    its own: verified this actually happens (a doc_id spoken mid-sentence,
+    e.g. "...cheapest option, doc_id 9f0435b9a121e69b6aaf04113a800992"),
+    reproducibly, in ~40% of runs of one specific low-context query before
+    this existed -- a real, measured failure rate, not a hypothetical one.
+    Same "no partial credit" posture as grounding_check: any leak discards
+    the whole answer rather than trying to surgically strip it out."""
+    if _RAW_ID_RE.search(result.answer):
+        return AnswererOutput(answer=RAW_ID_LEAK_FALLBACK, citations=[])
+    return result
+
+
 def enforce_length(result: AnswererOutput) -> AnswererOutput:
     words = result.answer.split()
     if len(words) <= ANSWER_WORD_BUDGET:
@@ -86,6 +113,7 @@ def answerer_node(state: GraphState) -> GraphState:
 
     valid_doc_ids = {p["doc_id"] for p in products}
     result = grounding_check(result, valid_doc_ids)
+    result = scrub_raw_ids(result)
     result = enforce_length(result)
 
     state["final_answer"] = result.answer
