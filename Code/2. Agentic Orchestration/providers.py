@@ -24,6 +24,13 @@ def get_chat_model(provider: str, model: str, **kwargs):
     if provider == "openai":
         from langchain_openai import ChatOpenAI
 
+        # use_responses_api=True: found by testing, not assumed -- the pinned
+        # reasoning model (gpt-5.6-luna) rejects function/tool-calling on the
+        # older /v1/chat/completions surface ("Function tools with
+        # reasoning_effort are not supported... use /v1/responses"). Routing
+        # through /v1/responses instead is what makes method="function_calling"
+        # (router.py/answerer.py) actually work with this model.
+        kwargs.setdefault("use_responses_api", True)
         return ChatOpenAI(model=model, **kwargs)
     if provider == "anthropic":
         from langchain_anthropic import ChatAnthropic

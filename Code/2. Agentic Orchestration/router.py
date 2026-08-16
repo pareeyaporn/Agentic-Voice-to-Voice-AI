@@ -1,6 +1,9 @@
 """
 Router node (§2.2): one structured-output LLM call does intent
 classification, constraint extraction, and safety-flag detection together.
+Uses method="function_calling" (OpenAI's tool-calling API), not the default
+json_schema mode -- the charter's LLM guidelines explicitly ask for
+function/tool calling to stay in use.
 
 System prompt: Code/6. Prompts & Documentation/router_system_prompt.md
 
@@ -38,7 +41,9 @@ class RouterOutput(BaseModel):
 with open(os.path.join(PROMPTS_DIR, "router_system_prompt.md")) as f:
     ROUTER_SYSTEM_PROMPT = f.read()
 
-router_llm = get_chat_model(LLM_PROVIDER, LLM_MODEL, temperature=0).with_structured_output(RouterOutput)
+router_llm = get_chat_model(LLM_PROVIDER, LLM_MODEL, temperature=0).with_structured_output(
+    RouterOutput, method="function_calling"
+)
 
 
 def classify_transcript(transcript: str) -> RouterOutput:

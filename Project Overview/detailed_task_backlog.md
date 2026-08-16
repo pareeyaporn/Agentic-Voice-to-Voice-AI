@@ -72,9 +72,11 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 - [x] Model: `gpt-5.6-luna`
 
 ### 2.3 Planner Node — `CP1` → `CP2`
-- [x] `use_rag` always `True`; `use_web` from a keyword rule (current/latest/now/in stock/etc.) — 7/7 test queries matched
-- [x] Field/comparison policy documented as a static rule (catalog fields don't vary per query): [planner_rules.md](../Code/6.%20Prompts%20%26%20Documentation/planner_rules.md)
-- [x] Deliberately no LLM call — the rule is already keyword-based; an LLM call would add cost with no clear gain
+- [x] `use_rag` always `True`; `use_web` decided by a real LLM tool call — [planner_system_prompt.md](../Code/6.%20Prompts%20%26%20Documentation/planner_system_prompt.md)
+- [x] **Revised from the original keyword-rule version, not the original build:** first shipped as a free keyword check (`current`/`latest`/`now`/`in stock`/etc., no LLM call). Re-reading the charter surfaced that its LLM guideline explicitly asks to "keep tool-use enabled (function/tool calling)," and this project made zero use of any LLM's native tool-calling API anywhere — the keyword rule never touched an LLM, and Router/Answerer's structured output used OpenAI's separate JSON-schema mode, not tool-calling. Fixed by giving Planner a real `WebSearch` tool via `.bind_tools()` and letting the model decide whether to call it, replacing the keyword list. Verified against the same 4 representative queries the keyword version was tested on — same decisions, now via a real tool call
+- [x] **Real, new cost, confirmed with the user before building:** this adds one real LLM call per query where Planner previously cost $0
+- [x] **Real API snag found and fixed:** the pinned model (a reasoning model) rejected tool-calling on the `/v1/chat/completions` surface outright ("Function tools with reasoning_effort are not supported... use /v1/responses") -- caught by actually running it, not assumed to work. Fixed by defaulting `use_responses_api=True` for the openai provider in `providers.py`'s `get_chat_model()`, which routes through `/v1/responses` instead
+- [x] **Router and Answerer also switched to real tool-calling** (`method="function_calling"` on their `with_structured_output()` calls) for the same charter-alignment reason -- free: same one call each, same parsed result, just OpenAI's tool-calling API instead of its separate structured-output API. Verified both still parse correctly with real calls
 
 ### 2.4 Retriever Node (Agentic RAG) — `CP2`
 - [x] Calls MCP tools only, via a persistent client (`mcp_client.py`), not `search()` directly. Server starts once per process (~0.2s first call, ~0.01s after); node is `async def`, graph runs via `await graph.ainvoke(...)`
@@ -97,6 +99,7 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 ### 2.6 LLM Provider Abstraction — `CP1`
 - [x] Provider: OpenAI (existing account); new dependency `langchain-openai` (confirmed with user)
 - [x] `get_chat_model(provider, model)` branches across openai/anthropic/google/bedrock — only openai is exercised, others untested but same interface
+- [x] openai branch defaults `use_responses_api=True` — found necessary by testing: the pinned reasoning model rejects tool-calling on the older `/v1/chat/completions` surface, needed for Router/Answerer/Planner's real tool-calling calls (§2.2/§2.3/§2.5)
 - [x] Dropped the "test 2+ providers" bullet — the brief only requires code swappability, not live multi-provider testing
 - [x] `invoke_and_log()` is the single LLM entrypoint for every node, capturing system prompt + I/O (Prompt Disclosure requirement)
 
@@ -104,7 +107,7 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 - [x] Free (0 LLM-cost) deterministic tests re-verified after `.py` extraction (Planner rule, grounding/length checks)
 - [x] Real end-to-end `graph.invoke()` test confirms the safety path skips Planner/Retriever/Answerer
 - [x] 6-query regression set through the real graph — surfaced a known, harmless gap: an out-of-scope "weather" query still retrieves products, but the Answerer stays honest rather than hallucinating
-- [x] Total cost: 12 real LLM calls across this notebook
+- [x] Total cost: 21 real LLM calls across this notebook (`{'planner': 9, 'router': 7, 'answerer': 5}`) -- up from 12 after Planner's keyword rule became a real tool-calling LLM call (§2.3)
 
 ---
 

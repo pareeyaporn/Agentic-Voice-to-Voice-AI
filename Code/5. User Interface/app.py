@@ -92,7 +92,7 @@ MOCK_EXAMPLES = {
         "step_log": [
             ("router", "Extracted query: \"insulated lunch box for kids\" | "
                         "constraints: {'budget_max': 20} | safety_flag: None"),
-            ("planner", "Plan: use_rag=True, use_web=False (no live-price/availability keywords)"),
+            ("planner", "Plan: use_rag=True, use_web=False (model chose not to call web_search)"),
             ("retriever", "Called rag.search -- retrieved 3 rag product(s), 0 conflicts, 0 tool errors"),
             ("answerer", "Synthesized answer with 2 citation(s)"),
         ],
@@ -111,7 +111,7 @@ MOCK_EXAMPLES = {
     "what's the current price of an insulated lunch box": {
         "step_log": [
             ("router", "Extracted query: \"insulated lunch box\" | constraints: {} | safety_flag: None"),
-            ("planner", "Plan: use_rag=True, use_web=True (\"current\" implies live price)"),
+            ("planner", "Plan: use_rag=True, use_web=True (model called web_search for current price)"),
             ("retriever", "Called rag.search, web.search -- retrieved 4 product(s) "
                            "(3 rag, 1 web), 0 conflicts, 0 tool errors"),
             ("answerer", "Synthesized answer with 2 citation(s)"),

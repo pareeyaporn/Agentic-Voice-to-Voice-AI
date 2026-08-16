@@ -1,10 +1,11 @@
 """
-Answerer/Critic node (§2.5). One structured-output LLM call synthesizes the
-spoken recommendation + citations; grounding, raw-ID leaks, and the length
-budget are then enforced deterministically in Python, not trusted to the
-prompt alone -- `scrub_raw_ids()` exists because a real test found the model
-spoke a raw doc_id mid-sentence in ~40% of runs on one low-context query
-despite the prompt saying not to.
+Answerer/Critic node (§2.5). One structured-output LLM call (method=
+"function_calling", OpenAI's tool-calling API -- see router.py's docstring
+for why) synthesizes the spoken recommendation + citations; grounding,
+raw-ID leaks, and the length budget are then enforced deterministically in
+Python, not trusted to the prompt alone -- `scrub_raw_ids()` exists because
+a real test found the model spoke a raw doc_id mid-sentence in ~40% of runs
+on one low-context query despite the prompt saying not to.
 
 The LLM only ever echoes back a `ref` (a candidate's `doc_id` for rag, `url`
 for web) without needing to classify which kind it is; `resolve_citations()`
@@ -50,7 +51,9 @@ class AnswererOutput(BaseModel):
 with open(os.path.join(PROMPTS_DIR, "answerer_critic_system_prompt.md")) as f:
     ANSWERER_SYSTEM_PROMPT = f.read()
 
-answerer_llm = get_chat_model(LLM_PROVIDER, LLM_MODEL, temperature=0).with_structured_output(AnswererOutput)
+answerer_llm = get_chat_model(LLM_PROVIDER, LLM_MODEL, temperature=0).with_structured_output(
+    AnswererOutput, method="function_calling"
+)
 
 
 def _ref(p: Dict[str, Any]) -> Optional[str]:
