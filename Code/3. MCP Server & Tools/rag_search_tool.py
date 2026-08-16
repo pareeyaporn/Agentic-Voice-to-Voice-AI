@@ -1,22 +1,16 @@
 """
 rag.search tool implementation (§3.2). `.py` module the §3.1 server imports
-at request time (file-format convention reason (c)) -- not a notebook.
+at request time -- not a notebook.
 
 Wraps §2.4's retriever.py `search()` (itself ported from §1.4) rather than
-re-deriving retrieval logic a third time. §2.4's retriever_node still calls
-`search()` directly for now (its own unchecked backlog item: "call MCP tools
-only... intentionally not yet") -- swapping that over to call this tool via
-MCP instead is a real architecture change (a sync LangGraph node becoming an
-async MCP client, subprocess lifecycle to manage) deliberately left as an
-explicit follow-up decision, not done silently as part of this file.
+re-deriving retrieval logic a third time. Retriever (§2.4) calls this tool
+via MCP, not `search()` directly.
 
-Output schema is exactly what search() already returns -- doc_id, title,
-price, price_per_unit, price_unit, brand, category_top, url, distance. The
-backlog's original draft schema ("id, title, price, brand?, features,
-doc_id") predates §1.3's actual metadata-payload decision: `features` was
-never stored as retrievable metadata (only used to build the embedding
-text), so it was never buildable -- corrected here rather than left stale
-or silently ignored.
+Output schema is exactly what search() returns -- doc_id, title, price,
+price_per_unit, price_unit, brand, category_top, url, distance. `features`
+isn't included: it was never stored as retrievable metadata (only used to
+build the embedding text, §1.3), so the backlog's original draft schema
+was never buildable as written.
 """
 
 import os
@@ -42,10 +36,10 @@ def rag_search_impl(
     category: Optional[str] = None,
     brand: Optional[str] = None,
 ) -> dict:
-    """Real implementation behind the `rag.search` MCP tool. Returns
-    {"products": [...], "warnings": [...]}. `category` is accepted (kept in
-    the input schema for forward-compatibility) but not applied -- see
-    module docstring -- and using it produces a warning, not a silent no-op."""
+    """Implementation behind the `rag.search` MCP tool. Returns
+    {"products": [...], "warnings": [...]}. `category` is accepted but not
+    applied (see module docstring); using it produces a warning, not a
+    silent no-op."""
     warnings = []
     if category is not None:
         warnings.append(

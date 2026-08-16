@@ -18,7 +18,7 @@ Orchestration is a LangGraph pipeline. Every retrieval path — private catalog 
 
 ```mermaid
 graph TD
-    A["🎤 User Voice Input"] -->|Audio File| B["ASR<br/>Whisper<br/>asr.py"]
+    A["🎤 User Voice Input"] -->|Audio File| B["ASR<br/>faster-whisper<br/>asr.py"]
 
     B -->|Transcript| C["Streamlit UI<br/>app.py"]
 
@@ -35,8 +35,8 @@ graph TD
 
     R -.->|Tool Call:<br/>web.search only if<br/>plan.use_web| G
 
-    G -->|Route to implementation<br/>rag.search| H["RAG Search<br/>tools/rag_search.py<br/>(wraps §1.4 search())"]
-    G -.->|Route to implementation<br/>web.search| I["Web Search<br/>tools/web_search.py<br/>(Tavily)"]
+    G -->|Route to implementation<br/>rag.search| H["RAG Search<br/>rag_search_tool.py<br/>(wraps §1.4 search())"]
+    G -.->|Route to implementation<br/>web.search| I["Web Search<br/>web_search_tool.py<br/>(Tavily)"]
 
     H -->|Return products| J["Chroma Vector DB<br/>built via<br/>1.3 build index.ipynb"]
     I -.->|Return results| K["Web API<br/>Tavily"]
@@ -51,7 +51,7 @@ graph TD
     S --> M["Streamlit UI<br/>Display Results"]
     L -->|Answer + Citations| M
 
-    M -->|Show Table| N["Comparison Table<br/>Title, Price, Brand, Features"]
+    M -->|Show Table| N["Comparison Table<br/>Title, Price, Brand, Source"]
     M -->|Show Log| O["Agent Log<br/>What happened<br/>at each node"]
 
     M -->|Answer Text| P["TTS<br/>OpenAI TTS<br/>tts.py"]
@@ -60,19 +60,19 @@ graph TD
     Q -->|Play| A
 ```
 
-The [Architecture](Architecture/) folder also has [architecture_comparison.mermaid](Architecture/architecture_comparison.mermaid), which contrasts a naive direct-function-call design against the required MCP-routed design — useful context for why the pipeline is shaped this way.
+See also [architecture_comparison.mermaid](Architecture/architecture_comparison.mermaid) — contrasts a naive direct-function-call design against the required MCP-routed design.
 
 ## Key Components
 
 | Component | Role |
 |---|---|
 | **Agentic Orchestration (LangGraph)** | Router (intent classifier) → Planner (source/field selection) → Retriever (agentic RAG via MCP) → Answerer/Critic (grounded synthesis + safety) |
-| **ASR** | Speech-to-text via local `faster-whisper` (free, no API key); fragment-based (record → transcribe), streaming not attempted |
+| **ASR** | Speech-to-text via local `faster-whisper` (free, no API key); fragment-based |
 | **Agentic RAG** | Hybrid vector + metadata search over the Amazon Product Dataset 2020, indexed in Chroma as two collections: `products_home_kitchen` (706-row demo slice) and `products_all` (9,930 rows, full catalog) |
-| **MCP Server** | One server, two tools — `rag.search` (private catalog) and `web.search` (live comparison via Tavily) — with tool discovery, schemas, caching (TTL 60–300s), and logging |
-| **TTS** | Spoken answer ≤15s via OpenAI TTS (provider-swappable by construction, only the OpenAI path is built); fragment-based, streaming not attempted |
-| **UI** | Streamlit (or React): mic input, live transcript, agent step log, comparison table, citations, Play-TTS button |
-| **LLM** | Model-agnostic — swappable via environment variables/config (OpenAI, Anthropic, Gemini, Bedrock, or open-weight Llama/Mistral/Qwen/Phi) |
+| **MCP Server** | One server, two tools — `rag.search` (private catalog) and `web.search` (live comparison via Tavily) — with tool discovery, schemas, caching, and logging |
+| **TTS** | Spoken answer ≤15s via OpenAI TTS (provider-swappable by construction) |
+| **UI** | Streamlit: mic input, live transcript, agent step log, comparison table, citations, Play-TTS button |
+| **LLM** | Model-agnostic — swappable via environment variables/config (OpenAI, Anthropic, Gemini, Bedrock, or open-weight) |
 
 ## Data
 
@@ -83,164 +83,83 @@ import kagglehub
 path = kagglehub.dataset_download("promptcloud/amazon-product-dataset-2020")
 ```
 
-This resolves to a single CSV, `marketing_sample_for_amazon_com-ecommerce__20200101_20200131__10k_data.csv` — **10,002 products, 28 columns**. We downloaded and inspected it directly (see [Code/1. Data Pipeline & Indexing/1.1 explore data.ipynb](Code/1.%20Data%20Pipeline%20&%20Indexing/1.1%20explore%20data.ipynb)); the real schema differs from a generic "id/title/brand/price/rating/features/ingredients" sketch in a few ways worth knowing before building on it. Everything here stays CSV end-to-end — no parquet conversion.
+Resolves to one CSV — **10,002 products, 28 columns**. The real schema differs from a generic "id/title/brand/price/rating/features/ingredients" sketch:
 
 | Field we need | Actual column | Note |
 |---|---|---|
-| id | `Uniq Id` | ✅ 100% populated, zero duplicates — the real primary key |
-| title | `Product Name` | ✅ 100% populated, but 137 duplicate values — dedupe in preprocessing |
-| category | `Category` | 91.7% populated (pipe-delimited hierarchy, e.g. `Home & Kitchen \| ...`); ~8% of rows have no category |
-| price | `Selling Price` | 98.9% non-null, but only 95.2% parse to a clean number; use this, not `List Price` (**0% populated**) |
-| features | `About Product` | 97.3% populated; closest match to a feature-bullet field, no column literally named "features" |
-| brand | — | `Brand Name` column exists but is **empty in 100% of rows** — must be parsed from `Product Name`/`About Product` instead |
-| ingredients | — | `Ingredients` column exists but is **empty in 100% of rows** — treat as unavailable |
-| rating | — | **no rating/stars field exists anywhere in this file** |
-| reviews | — | **no review-level data** — this is a single flat product table, not a products+reviews pair |
-| join key for a 2nd dataset | — | **`Asin` and `Sku` are also 100% empty** — no reliable external key exists; any join would have to be fuzzy, by title |
+| id | `Uniq Id` | 100% populated, zero duplicates |
+| title | `Product Name` | 100% populated, 137 duplicates — dedupe in preprocessing |
+| category | `Category` | 91.7% populated, pipe-delimited hierarchy |
+| price | `Selling Price` | 98.9% non-null, 95.2% parse cleanly; `List Price` is 0% populated |
+| features | `About Product` | 97.3% populated; closest match, no column literally named "features" |
+| brand | — | `Brand Name` is **100% empty** — parsed from `Product Name` instead |
+| ingredients / rating / reviews | — | **None of these exist in this dataset** |
+| join key for a 2nd dataset | — | `Asin`/`Sku` are also 100% empty — any join would have to be fuzzy, by title |
 
-**13 of the 28 columns are entirely empty** (`Product Description, Stock, Size Quantity Variant, Product Details, Dimensions, Color, Quantity, Ingredients, Asin, Brand Name, Direction To Use, List Price, Sku`) — see [Code/1. Data Pipeline & Indexing/processed/column_coverage.csv](Code/1.%20Data%20Pipeline%20&%20Indexing/processed/column_coverage.csv) for the full per-column breakdown.
+13 of the 28 columns are entirely empty — see [column_coverage.csv](Code/1.%20Data%20Pipeline%20&%20Indexing/processed/column_coverage.csv) for the full breakdown.
 
-Category distribution is also skewed: **67% Toys & Games**; `Home & Kitchen` (706 rows) and `Sports & Outdoors` (540 rows) are the next largest, while `Household`/`Cleaning` categories total only ~25 rows — too sparse to be the demo slice. **`Home & Kitchen` is the demo category**, composed mainly of kids' bedding, furniture, décor, party supplies, and lunch boxes (only ~7.5% is Kitchen & Dining).
+Category distribution is skewed (~67% Toys & Games); **`Home & Kitchen`** (706 rows) is the demo category, mostly kids' bedding/furniture/décor/party supplies rather than cookware. Practical implications:
+- No rating/ingredients data exists — dropped from the pitch/UI rather than faked
+- Brand is regex-parsed from the title, not a reliable field — treated as low-confidence
+- Demo queries target what the data actually has (lunch boxes, bedding, storage, party supplies)
 
-Practical implications:
-- Star ratings can't be cited in answers/UI unless a second dataset is fuzzy-joined by title (no ASIN/SKU key exists here) — otherwise drop rating from the pitch and UI.
-- Brand should be extracted via regex/LLM parsing from `Product Name`, not read from `Brand Name`.
-- "Ingredients" won't be populated for any products; don't design retrieval filters that assume it is.
-- Demo/example queries should target what this data actually has: kids' lunch boxes, bedding, furniture, storage, party supplies.
-
-Full writeup of the schema decision and licensing (CC0 Public Domain): [Project Overview/data_schema_and_licensing.md](Project%20Overview/data_schema_and_licensing.md).
-
-Products are embedded on `Product Name` + `About Product` (+ `Product Specification`/`Technical Details` if useful) and indexed for hybrid retrieval; prices are unit-normalized where package size is available, for fair comparison.
+Full schema + licensing (CC0 Public Domain) write-up: [data_schema_and_licensing.md](Project%20Overview/data_schema_and_licensing.md).
 
 ## Repository Structure
 
-Folders under `Code/` are numbered to match the [task backlog](Project%20Overview/detailed_task_backlog.md)'s own section numbers, so it's always obvious which part of the backlog a given folder implements.
-
-```
-Project/
-├── Architecture/                    # System diagrams (Mermaid)
-├── Code/                            # Implementation (in progress)
-│   ├── 1. Data Pipeline & Indexing/ # §1 — exploration/preprocessing/indexing notebooks
-│   │                                 #   (CSV in, CSV out — no parquet)
-│   └── 2. Agentic Orchestration/    # §2 — LangGraph state schema + node graph (design started)
-├── Data/                            # Raw Kaggle download (CSV + zip) — see Data/README.md
-├── Project Overview/                # Project description, team structure, task backlog, data schema & licensing
-├── .env.example                     # config template (embeddings, LLM, web-search — see §1.3)
-└── README.md
-```
-
-Code layout as implementation lands (folder numbers match backlog sections §1–§6; §3–§6 are
-still planned, named here for orientation only):
+Folders under `Code/` are numbered to match the [task backlog](Project%20Overview/detailed_task_backlog.md)'s section numbers.
 
 ```
 Code/
 ├── 1. Data Pipeline & Indexing/
-│   ├── 1.1 explore data.ipynb       # field coverage, price distribution, duplicates, category counts
-│   ├── 1.2 process data.ipynb       # text cleaning, brand/unit extraction, dedup, category flattening
-│   ├── 1.3 build index.ipynb        # embedding + Chroma indexing (2 collections), viz, config-driven
-│   ├── 1.4 hybrid retrieval.ipynb   # vector + metadata search, unit-aware tie-breaking, doc_id citations
-│   ├── 1.5 rag evaluation.ipynb     # precision/recall@5 eval set, failure-case analysis
-│   └── processed/                   # generated outputs (column_coverage.csv, products_clean.csv,
-│                                     #   chroma_db_home_kitchen/ [committed, ~6.6MB],
-│                                     #   chroma_db_all/ [gitignored, ~65MB — rebuild via 1.3])
+│   ├── 1.1 explore data.ipynb        # field coverage, price distribution, category counts
+│   ├── 1.2 process data.ipynb        # text cleaning, brand/unit extraction, dedup
+│   ├── 1.3 build index.ipynb         # embedding + Chroma indexing (2 collections)
+│   ├── 1.4 hybrid retrieval.ipynb    # vector + metadata search, unit-aware tie-breaking
+│   ├── 1.5 rag evaluation.ipynb      # precision/recall@5 eval set
+│   └── processed/                    # products_clean.csv, chroma_db_home_kitchen/ (committed),
+│                                      #   chroma_db_all/ (gitignored — rebuild via 1.3)
 ├── 2. Agentic Orchestration/
-│   ├── 2.1-2.6 graph and nodes.ipynb # design/prototyping record (§2.1-2.6, frozen, not
-│   │                                 #   re-synced with the .py files below)
-│   ├── 2.7 testing.ipynb             # imports the real graph.py for real (§2.7) — extraction
-│   │                                 #   sanity checks (free), 1 e2e test, 6-query regression set
-│   ├── config.py                     # REPO_ROOT, .env loading (§2.6)
-│   ├── state.py                      # GraphState/Plan/ToolResults, EMPTY_STATE (§2.1)
-│   ├── providers.py                  # get_chat_model() real branching + invoke_and_log() (§2.6)
-│   ├── router.py                     # Router + safe_refusal nodes (§2.2)
-│   ├── planner.py                    # Planner node, rule-based (§2.3)
-│   ├── retriever.py                  # Retriever node (§2.4) — calls rag.search/web.search via
-│   │                                 #   mcp_client.py; search() itself stays here for
-│   │                                 #   rag_search_tool.py (§3.2) to import, ported from §1.4
-│   ├── mcp_client.py                 # persistent MCP client (the Retriever swap) — starts
-│   │                                 #   Code/3. MCP Server & Tools/mcp_server.py once, reuses
-│   │                                 #   one ClientSession across queries, not per-query
-│   ├── answerer.py                   # Answerer/Critic node (§2.5) — grounding, length, and
-│   │                                 #   raw-ref-leak all enforced deterministically, not
-│   │                                 #   trusted to the prompt alone. Cites by a generic `ref`
-│   │                                 #   (doc_id for rag, url for web), resolved to
-│   │                                 #   source/doc_id/url by lookup, never trusted from the
-│   │                                 #   LLM's own claim — what makes citations "clearly
-│   │                                 #   distinguished" (§5.2) actually possible.
-│   │                                 #   format_candidates() splits 5 rag + 3 web (not a
-│   │                                 #   combined truncation — that silently hid every web
-│   │                                 #   candidate from the LLM regardless of relevance)
-│   └── graph.py                      # wires the above into the compiled `graph` (async since
-│                                     #   the swap — invoke via `await graph.ainvoke(...)`) —
-│                                     #   what §2.7 imports today, §5's UI will import later
-├── 3. MCP Server & Tools/            # README.md inside covers this section in full
-│   ├── mcp_server.py                  # server (§3.1) — stdio transport, registers both tools,
-│   │                                  #   both wrapped in @logged_tool (§3.4)
-│   ├── rag_search_tool.py             # rag.search implementation (§3.2) — wraps §2.4's
-│   │                                  #   retriever.py search() against the real committed index
-│   ├── web_search_tool.py             # web.search implementation (§3.3) — Tavily via
-│   │                                  #   tavily-python, caching, backoff, domain allowlist
-│   ├── tool_logging.py                # cross-cutting (§3.4): logging, secret scrubbing,
-│   │                                  #   typed ToolError contract, applied to both tools
-│   ├── 3.1 server skeleton smoke test.ipynb    # real subprocess + stdio round-trip test
-│   ├── 3.2 rag search tool test.ipynb           # real subprocess + stdio, 4 cases against
-│   │                                            #   the real index (no fixture index built)
-│   ├── 3.3 web search tool test.ipynb            # 1 real Tavily call (via real MCP server)
-│   │                                             #   + 6 mocked cases (caching/backoff/allowlist)
-│   └── 3.4 cross-cutting test.ipynb               # logging/scrubbing/typed-error tests
+│   ├── 2.1-2.6 graph and nodes.ipynb # frozen design/prototyping record, not kept in sync
+│   ├── 2.7 testing.ipynb             # tests the real graph.py — e2e + regression queries
+│   ├── config.py, state.py, providers.py   # config, GraphState schema, LLM provider abstraction
+│   ├── router.py, planner.py               # Router (+ safe_refusal) and Planner nodes
+│   ├── retriever.py, mcp_client.py         # Retriever node + persistent MCP client
+│   ├── answerer.py                         # Answerer/Critic node — grounding, citations, TTS-length budget
+│   └── graph.py                            # compiles the graph; invoke via `await graph.ainvoke(...)`
+├── 3. MCP Server & Tools/             # see the README inside for full detail
+│   ├── mcp_server.py                  # stdio MCP server, registers both tools
+│   ├── rag_search_tool.py             # rag.search — wraps §1.4/§2.4's search()
+│   ├── web_search_tool.py             # web.search — Tavily, caching, backoff, domain allowlist
+│   ├── tool_logging.py                # logging, secret scrubbing, typed ToolError
+│   └── 3.1-3.4 *.ipynb                # real subprocess + stdio tests per tool
 ├── 4. Speech (ASR + TTS)/
-│   ├── speech_config.py                 # own config module (ASR/TTS are a disjoint concern
-│   │                                    #   from §2's LLM config) — ASR_*/TTS_* env vars, .env
-│   │                                    #   loading. Named speech_config.py, not config.py —
-│   │                                    #   §5's UI imports from both §2 and §4 in one process,
-│   │                                    #   and two same-named bare `config` modules would
-│   │                                    #   silently collide (caught by testing that import)
-│   ├── asr.py                          # transcribe() (§4.1) — local faster-whisper, lazy
-│   │                                    #   process-wide singleton model, typed ASRError
-│   ├── tts.py                          # synthesize() (§4.2) — OpenAI TTS, deterministic <=15s
-│   │                                    #   budget enforcement (measured duration, not word
-│   │                                    #   count — see the real wave-header bug this caught),
-│   │                                    #   typed TTSError
-│   └── 4.1-4.2 speech smoke test.ipynb # real TTS->ASR round trip, budget-correction case
-│                                        #   exercised for real, multilingual smoke test
-│                                        #   (synthesized audio, stated limitation), error paths
+│   ├── speech_config.py              # ASR/TTS config (separate from §2's config.py — see note below)
+│   ├── asr.py                        # transcribe() — local faster-whisper, typed ASRError
+│   ├── tts.py                        # synthesize() — OpenAI TTS, measured <=15s budget, typed TTSError
+│   └── 4.1-4.2 speech smoke test.ipynb  # real TTS->ASR round trip + error paths
 ├── 5. User Interface/
-│   ├── app.py                        # Streamlit entrypoint (§5.1-5.2) — mic recorder
-│   │                                  #   (streamlit-mic-recorder) + file-upload + type-text
-│   │                                  #   input, editable transcript, agent step log (via
-│   │                                  #   graph.astream()), comparison table, citations +
-│   │                                  #   data lineage, Play-TTS button, mock-data mode
-│   └── async_runtime.py              # sync<->async bridge — one persistent background
-│                                      #   event-loop thread for the process's whole life, so
-│                                      #   §2.4's persistent MCP session survives across
-│                                      #   Streamlit reruns (verified directly: same
-│                                      #   ClientSession object id() across separate
-│                                      #   run_async() calls, 2nd call ~3x faster than the 1st)
+│   ├── app.py                        # Streamlit entrypoint — mic/upload/text input, step log,
+│   │                                  #   comparison table, citations, Play-TTS, mock-data mode
+│   └── async_runtime.py              # sync<->async bridge so the persistent MCP session
+│                                      #   survives across Streamlit reruns
 └── 6. Prompts & Documentation/
-    ├── router_system_prompt.md          # Router's system prompt (§6 Prompt Disclosure)
-    ├── planner_rules.md                 # Planner's rule + rationale (not an LLM prompt — §2.3
-    │                                     #   explains why)
-    └── answerer_critic_system_prompt.md # Answerer/Critic's system prompt. Retriever (§2.4)
-                                          #   has no prompt of its own — no LLM call in that node
+    ├── router_system_prompt.md
+    ├── planner_rules.md               # not an LLM prompt — Planner is rule-based, no LLM call
+    └── answerer_critic_system_prompt.md
 ```
 
-**§3 status:** 3.1–3.4 all done, and Retriever (§2.4) now calls both tools through this
-server for real via a persistent MCP client — see
-[Code/3. MCP Server & Tools/README.md](Code/3.%20MCP%20Server%20%26%20Tools/README.md)
-and `Code/2. Agentic Orchestration/mcp_client.py`.
+Two notes worth knowing before editing: `speech_config.py` (§4) is deliberately not named `config.py` — §5's UI imports both §2's and §4's config in one process, and two same-named bare modules would silently collide. `2.1-2.6 graph and nodes.ipynb` is an intentionally frozen design record; the `.py` files are the live implementation.
 
 ## Team
 
-See [team_structure_and_task_breakdown.md](Project%20Overview/team_structure_and_task_breakdown.md) for the full role breakdown, week-by-week critical path, and deliverables checklist.
+See [team_structure_and_task_breakdown.md](Project%20Overview/team_structure_and_task_breakdown.md) for the full role breakdown and [detailed_task_backlog.md](Project%20Overview/detailed_task_backlog.md) for the granular task list.
 
-For the granular, checkable engineering task list (per component, per checkpoint), see [detailed_task_backlog.md](Project%20Overview/detailed_task_backlog.md).
-
-4-person team, no separate Project Lead — coordination/documentation duties are folded into
-the 4 roles below (see [team_structure_and_task_breakdown.md](Project%20Overview/team_structure_and_task_breakdown.md)
-for the full reasoning).
+4-person team, no separate Project Lead — coordination/documentation duties are folded into the 4 roles:
 
 | Role | Owns |
 |---|---|
-| Orchestration Lead | LangGraph pipeline, routing logic, prompts, conflict resolution, `prompts/` folder + prompt disclosure, graph design write-up, safety notes |
+| Orchestration Lead | LangGraph pipeline, routing logic, prompts, conflict resolution, `prompts/` folder, graph design write-up, safety notes |
 | Data Engineer | Data pipeline, vector DB indexing, hybrid retrieval, RAG eval, data write-up |
 | Voice/Integration Engineer | ASR, TTS, MCP server, web-search tool, performance testing, MCP README |
 | Frontend/UI Engineer | Streamlit app, audio I/O, comparison table, UX, root README, `.env.example`, demo/presentation |
@@ -255,7 +174,7 @@ for the full reasoning).
 
 ## Status
 
-🚧 In progress — §1 (Data Pipeline & Indexing), §2 (Agentic Orchestration), §3 (MCP Server & Tools), §4 (Speech: ASR + TTS) are implemented and tested; §5 (User Interface) scaffold + core flow (§5.1-5.2) are wired end-to-end and tested, polish (§5.3) not started.
+🚧 In progress — §1-4 (Data, Orchestration, MCP, Speech) are implemented and tested. §5 (UI) scaffold + core flow are wired end-to-end and tested; polish (§5.3) not started.
 
 ## License
 

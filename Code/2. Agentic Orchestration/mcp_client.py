@@ -1,14 +1,11 @@
 """
-Persistent MCP client (the Retriever swap, closing §2.4's "Call MCP tools
-only" item). Spawns Code/3. MCP Server & Tools/mcp_server.py ONCE and keeps a
-long-lived ClientSession open across the whole process lifetime, instead of
-reconnecting per query -- avoids reloading the embedding model on every
-single user turn. Verified for real before writing this: first call ~0.2s
-(model load), every call after ~0.01s on the same session.
+Persistent MCP client (§2.4). Spawns `Code/3. MCP Server & Tools/mcp_server.py`
+once and keeps a long-lived ClientSession open for the process's lifetime
+instead of reconnecting per query -- ~0.2s first call (model load), ~0.01s
+after, on the same session.
 
 Uses AsyncExitStack (stdlib) to hold the stdio_client + ClientSession async
-context managers open beyond a single `async with` block -- the standard
-tool for "enter now, don't know exactly when you'll exit."
+context managers open beyond a single `async with` block.
 """
 
 import json
@@ -32,10 +29,8 @@ _ERROR_TYPE_RE = re.compile(r"\[(\w+)\]")
 
 class ToolCallError(Exception):
     """Client-side reconstruction of the server's typed ToolError.
-    error_type is parsed from MCP's text-only error format ("Error
-    executing tool <name>: [error_type] message") -- the type survives the
-    wire protocol's text-only error result, same design as the server side
-    (tool_logging.ToolError, §3.4)."""
+    error_type is parsed from MCP's text-only error format
+    ("Error executing tool <name>: [error_type] message")."""
 
     def __init__(self, error_type: str, message: str):
         self.error_type = error_type
@@ -62,18 +57,14 @@ async def get_session() -> ClientSession:
 
 
 async def close() -> None:
-    """Shuts down the persistent subprocess/session. Best-effort, and a real
-    limitation worth stating plainly rather than hiding: anyio ties the
-    underlying task group to whichever asyncio Task first opened the
-    session. LangGraph runs async nodes in its own internally-spawned task
-    (confirmed by hitting this directly, not documented anywhere) -- so the
-    session usually ends up "owned" by a LangGraph-internal task, and
-    calling close() from anywhere else raises anyio's "Attempted to exit
-    cancel scope in a different task than it was entered in." Caught and
-    logged here rather than crashing the caller. Doesn't matter functionally
-    for a single-process app: the server subprocess dies with the parent
-    process either way, so this only affects how *graceful* shutdown looks,
-    not correctness."""
+    """Shuts down the persistent subprocess/session. Best-effort: anyio ties
+    the underlying task group to whichever asyncio Task first opened the
+    session, and LangGraph runs async nodes in its own internally-spawned
+    task -- so calling close() from elsewhere often raises anyio's "exit
+    cancel scope in a different task" RuntimeError. Caught and logged here
+    rather than crashing the caller; doesn't affect correctness since the
+    subprocess dies with the parent process regardless, only how graceful
+    the shutdown looks."""
     global _exit_stack, _session
     if _exit_stack is not None:
         try:

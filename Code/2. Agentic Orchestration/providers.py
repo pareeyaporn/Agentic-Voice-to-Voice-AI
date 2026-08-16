@@ -1,16 +1,13 @@
 """
 LLM provider abstraction + central prompt/logging wrapper (§2.6).
 
-get_chat_model() branches on LLM_PROVIDER for real (openai/anthropic/google/
-bedrock, the assignment brief's own listed hosted options) instead of
-hardcoding one provider's class -- that's what the brief's Model-Agnostic
-Requirement actually asks for ("the code is swappable via environment
-variables/config"). Only the openai path is exercised; the others are written
-to the same interface but genuinely untested -- stated, not hidden.
+get_chat_model() branches on LLM_PROVIDER (openai/anthropic/google/bedrock)
+instead of hardcoding one provider's class, per the brief's Model-Agnostic
+Requirement. Only the openai path is exercised; the others share the same
+interface but are untested.
 
 invoke_and_log() is the only path any node uses to call an LLM, capturing
-system prompt + input + output into LLM_CALL_LOG (the brief's separate "log
-prompts & system messages for transparency" / Prompt Disclosure requirement).
+system prompt + input + output into LLM_CALL_LOG (Prompt Disclosure).
 """
 
 from typing import Any, Dict, List

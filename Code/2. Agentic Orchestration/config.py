@@ -1,11 +1,9 @@
 """
-Shared config for the graph package (§2.1-2.6, extracted from
-"2.1-2.6 graph and nodes.ipynb" once §2.7's testing notebook needed a real,
-importable graph -- see that notebook's file-format note for why).
+Shared config for the graph package (§2.1-2.6), extracted from
+"2.1-2.6 graph and nodes.ipynb" once §2.7 needed a real importable graph.
 
 Uses __file__-based path resolution, not the notebook's os.getcwd() trick --
-a .py module can be imported from any working directory, unlike a notebook
-launched from its own folder.
+a .py module can be imported from any working directory.
 """
 
 import os

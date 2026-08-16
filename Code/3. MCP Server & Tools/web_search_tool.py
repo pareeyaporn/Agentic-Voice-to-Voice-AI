@@ -1,28 +1,19 @@
 """
 web.search tool implementation (§3.3). `.py` module the §3.1 server imports
-at request time (file-format convention reason (c)) -- not a notebook.
+at request time -- not a notebook.
 
-Provider: Tavily (decided in §3.3's original entry) via the official
-`tavily-python` client, not raw HTTP -- avoids hand-rolling auth/request
-shape/error handling Tavily's own SDK already provides.
+Provider: Tavily, via the official `tavily-python` client.
 
-Output schema per the assignment brief: {title, url, snippet, price?,
-availability?}. Tavily's raw response gives title/url/content (mapped to
-snippet) directly, but no structured price/availability fields -- those are
-extracted from the snippet text with a lightweight regex/keyword heuristic,
-same honesty posture as §1.2's brand extraction: real, best-effort, openly
-low-confidence, not fabricated. Verified against a real snippet that
-literally contained "$35 ... Sold out" (see the §3.3 test notebook).
+Output: {title, url, snippet, price?, availability?}. Tavily gives
+title/url/content directly; price/availability aren't structured fields, so
+they're extracted from the snippet text with a regex/keyword heuristic --
+real, best-effort, openly low-confidence, not fabricated.
 
-Robots.txt/ToS: handled server-side by Tavily's own crawling infrastructure
-(the reason Tavily was picked over raw scraping, per §3.3's original
-decision) -- not re-implemented here. Domain allowlist is real and ours:
-passed to Tavily as `include_domains`, restricting results to known
-legitimate retail/marketplace domains rather than the open web.
+Robots.txt/ToS is handled server-side by Tavily's crawling infrastructure.
+Domain allowlist is ours: passed to Tavily as `include_domains`.
 
-Caching (TTL) and rate-limit backoff are both real, both unit-tested with
-mocked responses (not against the live API -- deterministic, and doesn't
-spend real Tavily credits to prove retry/backoff timing).
+Caching (TTL) and rate-limit backoff are unit-tested with mocked responses,
+not the live API -- deterministic, and doesn't spend real Tavily credits.
 """
 
 import os
@@ -37,11 +28,9 @@ from tavily.errors import UsageLimitExceededError
 
 from tool_logging import ToolError
 
-# Same config/.env loading rag_search_tool.py uses -- real bug caught while
-# testing this module standalone: without this, TAVILY_API_KEY was only ever
-# in os.environ as a side effect of some *other* module happening to import
-# config.py first. Load it explicitly here so this module is correct on its
-# own, not dependent on import order elsewhere.
+# Same config/.env loading rag_search_tool.py uses -- without this,
+# TAVILY_API_KEY only ended up in os.environ as a side effect of some other
+# module importing config.py first (caught testing this module standalone).
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "2. Agentic Orchestration"))
 import config  # noqa: F401,E402  (imported for its side effect: loading .env)
 
@@ -92,12 +81,9 @@ def _extract_availability(snippet: str) -> Optional[str]:
 
 
 def _call_with_backoff(query: str, max_results: int) -> dict:
-    """Retries on transient errors only (timeout, usage-limit) -- not on
-    client errors like a bad API key or malformed request, where retrying
-    can't help. Raises a typed ToolError after exhausting retries, not the
-    raw Tavily exception -- §3.4's error contract, so a caller (once the
-    Retriever calls this via MCP, §2.4's open swap) can branch on
-    `error_type` rather than parse free text."""
+    """Retries on transient errors only (timeout, usage-limit), not client
+    errors like a bad API key. Raises a typed ToolError after exhausting
+    retries so a caller can branch on `error_type` (§3.4's error contract)."""
     last_error = None
     for attempt in range(MAX_RETRIES):
         try:

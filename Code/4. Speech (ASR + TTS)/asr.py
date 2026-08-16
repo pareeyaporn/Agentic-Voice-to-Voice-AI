@@ -1,16 +1,9 @@
 """
 ASR module (§4.1). Speech-to-text via faster-whisper, run locally -- free,
-no API key/billing, same cost-conscious reasoning as §1.3's local
-sentence-transformers embeddings (confirmed with the user before adding as
-a new dependency, per the project's tech-confirmation convention).
+no API key/billing, same reasoning as §1.3's local embeddings.
 
-.py per the file-format convention (reason (c): the UI (§5, not yet built)
-will import transcribe() directly at query time -- once per mic recording,
-not a one-shot notebook run).
-
-Fragment-based only: the full clip is recorded first (the UI's job, §5.1),
-then transcribed in one call here. Streaming ASR is the backlog's own
-stated stretch goal, not attempted.
+Fragment-based: the UI (§5.1) records the full clip, this transcribes it in
+one call. Streaming ASR is a stated stretch goal, not attempted.
 """
 
 import os
@@ -19,16 +12,11 @@ from typing import List, Optional
 
 from speech_config import ASR_COMPUTE_TYPE, ASR_DEVICE, ASR_MODEL_SIZE
 
-_model = None  # lazy-loaded, process-wide singleton: model load (~seconds)
-# is the expensive part, so it happens once per process, not once per call --
-# same reasoning as §2's persistent MCP session (pay startup cost once, not
-# per query).
+_model = None  # lazy-loaded, process-wide singleton -- model load (~seconds) happens once, not per call
 
 
 class ASRError(Exception):
-    """Typed so a caller (the UI, §5) can branch on failure instead of
-    catching a bare Exception -- same error-handling posture as §3.4's
-    ToolError."""
+    """Typed so a caller can branch on failure instead of catching a bare Exception."""
 
     def __init__(self, message: str):
         self.message = message
@@ -60,10 +48,9 @@ def _get_model():
 
 
 def transcribe(audio_path: str) -> TranscriptionResult:
-    """audio_path: a WAV/MP3 file path (whatever the UI's mic capture wrote
-    to disk) -- faster-whisper decodes both, and anything else its bundled
-    PyAV can read, through the same call. Returns the full transcript text
-    plus per-segment timestamps and the detected language."""
+    """audio_path: a WAV/MP3/webm file path -- faster-whisper decodes all of
+    these (via its bundled PyAV). Returns the transcript, per-segment
+    timestamps, and detected language."""
     if not os.path.exists(audio_path):
         raise ASRError(f"Audio file not found: {audio_path}")
 
@@ -74,10 +61,7 @@ def transcribe(audio_path: str) -> TranscriptionResult:
             TranscriptSegment(text=s.text.strip(), start=s.start, end=s.end) for s in segments_iter
         ]
     except Exception as e:
-        # faster-whisper/ctranslate2/PyAV can raise several distinct
-        # exception types for a bad/corrupt/unsupported file -- wrapped into
-        # one typed ASRError rather than the caller needing to know all of
-        # them.
+        # faster-whisper/ctranslate2/PyAV raise several exception types -- normalized to one ASRError
         raise ASRError(f"Transcription failed: {e}") from e
 
     full_text = " ".join(s.text for s in segments).strip()

@@ -1,12 +1,8 @@
 """
 Cross-cutting concerns for MCP tool calls (§3.4): structured logging, secret
-scrubbing, and a typed error contract. Applied to both tools via the
-`@logged_tool` decorator in mcp_server.py, not via the SDK's low-level
-`ServerMiddleware` protocol -- that hooks every inbound request/notification
-at the wire-protocol level (before params validation, with its own deadlock
-caveats around server-to-client calls mid-handshake); wrapping just the two
-tool functions is simpler, fully within this project's control, and covers
-exactly what's needed here.
+scrubbing, and a typed error contract. Applied via the `@logged_tool`
+decorator in mcp_server.py -- simpler than the SDK's low-level
+`ServerMiddleware` protocol, and covers exactly what's needed here.
 """
 
 import functools
@@ -17,10 +13,8 @@ from typing import Any, Callable
 
 TOOL_CALL_LOG: list[dict] = []
 
-# Redact by value (any currently-configured secret, if it appears verbatim
-# anywhere in logged data) AND by shape (common API key prefixes), so a
-# secret still gets caught even if it changes or a *different* key format
-# ever gets logged incidentally.
+# Redact by value (currently-configured secrets) AND by shape (common API
+# key prefixes), so a secret is still caught even from an unexpected source.
 _SECRET_ENV_VARS = ("OPENAI_API_KEY", "TAVILY_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY")
 _SECRET_SHAPE_RE = re.compile(r"\b(sk-[A-Za-z0-9_-]{10,}|tvly-[A-Za-z0-9_-]{10,})\b")
 
@@ -55,12 +49,9 @@ def _extract_source_urls(response: Any) -> list[str]:
 
 
 class ToolError(Exception):
-    """Typed error contract: `error_type` is machine-branchable (the actual
-    requirement -- "tools return typed errors the Retriever node can branch
-    on"), `message` is the human-readable text. str(ToolError) is
-    "[error_type] message" so the type survives even through MCP's
-    text-only error-result format (see mcp_server.py's tool docstrings for
-    how a raised exception becomes a CallToolResult)."""
+    """Typed error contract: `error_type` is machine-branchable, `message`
+    is human-readable. str(ToolError) is "[error_type] message" so the type
+    survives MCP's text-only error-result format."""
 
     def __init__(self, error_type: str, message: str):
         self.error_type = error_type
@@ -69,10 +60,9 @@ class ToolError(Exception):
 
 
 def logged_tool(tool_name: str) -> Callable:
-    """Decorator: logs request/response/timestamp/source_urls for every
-    call, scrubs secrets before logging, and normalizes any exception into a
-    ToolError (typed) before it propagates -- so both the log and the error
-    the caller sees carry a machine-branchable error_type, not just free text."""
+    """Logs request/response/timestamp/source_urls for every call, scrubs
+    secrets before logging, and normalizes any exception into a typed
+    ToolError before it propagates."""
 
     def decorator(fn: Callable) -> Callable:
         @functools.wraps(fn)

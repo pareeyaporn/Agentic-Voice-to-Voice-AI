@@ -1,12 +1,10 @@
 """
-Planner node (§2.3): rule-based, no LLM call. use_rag is always True; use_web
-comes from a keyword rule, not a model call -- the decision is a single
-binary and the backlog's own framing of the rule was already keyword-based
-("skip web.search unless query implies current/latest/now"), so an LLM call
-here wasn't worth the added cost/latency.
+Planner node (§2.3): rule-based, no LLM call. use_rag is always True;
+use_web comes from a keyword rule -- a simple binary decision, not worth
+the added cost/latency of a model call.
 
-Rule + rationale: Code/6. Prompts & Documentation/planner_rules.md (the
-backlog's CP2 "planner rules" deliverable -- not an LLM prompt, see that file).
+Rule + rationale: Code/6. Prompts & Documentation/planner_rules.md
+(not an LLM prompt -- see that file).
 """
 
 from state import GraphState

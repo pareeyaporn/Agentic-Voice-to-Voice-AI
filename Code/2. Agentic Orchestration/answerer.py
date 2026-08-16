@@ -1,36 +1,21 @@
 """
 Answerer/Critic node (§2.5). One structured-output LLM call synthesizes the
-spoken recommendation + citations -- but grounding, raw-ID leaks, the ~15s
-length budget, and (see below) *which* identifier a citation actually is are
-all resolved deterministically in Python afterward, not trusted to the
-prompt alone. A prompt instruction is a request; a citation compared against
-the actual list of retrieved products is a fact.
+spoken recommendation + citations; grounding, raw-ID leaks, and the length
+budget are then enforced deterministically in Python, not trusted to the
+prompt alone -- `scrub_raw_ids()` exists because a real test found the model
+spoke a raw doc_id mid-sentence in ~40% of runs on one low-context query
+despite the prompt saying not to.
 
-scrub_raw_ids() exists because the prompt alone genuinely wasn't reliable
-enough: verified a real, reproducible case (~40% of runs on one low-context
-query) where the model spoke a raw doc_id mid-sentence despite the prompt
-saying not to -- caught by testing the actual behavior, not assumed fixed
-just because the prompt asked nicely.
-
-**Citations, rag vs. web:** the LLM only ever echoes back a `ref` (a
-candidate's `doc_id` if it's a rag result, its `url` if it's a web result --
-whichever `format_candidates()` showed it). It never has to *classify*
-which kind it is. resolve_citations() does that by looking the ref up
-against the real retrieved products and building the citation from
-ground-truth data (source/doc_id/url/title) -- deliberately not trusting the
-LLM to self-report `source` correctly, same reasoning as scrub_raw_ids():
-don't ask the model to make a judgment call Python can just verify.
+The LLM only ever echoes back a `ref` (a candidate's `doc_id` for rag, `url`
+for web) without needing to classify which kind it is; `resolve_citations()`
+looks the ref up against the real retrieved products to build the citation
+from ground truth, rather than trusting the model's own source claim.
 
 System prompt: Code/6. Prompts & Documentation/answerer_critic_system_prompt.md
 
-No separate chemical-safety re-check here: Router (§2.2) already routes
-unsafe requests to safe_refusal before Answerer ever runs -- by construction,
-Answerer never sees a flagged-unsafe query.
-
-Empty results skip the LLM call entirely: if tool_results.products is empty,
-the correct answer is knowable in advance (say nothing was found), so this
-returns a fixed fallback directly -- cheaper than a call, zero hallucination
-risk on a case a rule already covers completely.
+Router (§2.2) already routes unsafe requests to `safe_refusal`, so no
+separate safety re-check happens here. Empty results skip the LLM call
+entirely and return a fixed fallback.
 """
 
 import os
@@ -48,11 +33,8 @@ NO_RESULTS_FALLBACK = "I couldn't find a good match for that in the catalog."
 UNGROUNDED_FALLBACK = "I found some options but couldn't confirm the details, so I don't want to guess."
 RAW_ID_LEAK_FALLBACK = "I found a good match but had trouble summarizing it cleanly -- let me know if you'd like me to try again."
 
-# A `ref` is either a doc_id (32-char hex, md5-shaped, from products_clean.csv's `id`
-# column, §1.3) or a url (web citations, since the citation schema change). Both get
-# checked -- a URL leak is exactly as bad as a doc_id leak now that either can be a ref.
-# 16+ hex chars is a generous floor for the doc_id case -- real spoken content basically
-# never produces a string that long and that shape by accident.
+# A `ref` is either a doc_id (32-char hex, §1.3) or a url. 16+ hex chars is a
+# generous floor -- real spoken content essentially never matches by accident.
 _RAW_ID_RE = re.compile(r"\b[0-9a-f]{16,}\b|https?://\S+|www\.\S+", re.IGNORECASE)
 
 
@@ -78,17 +60,11 @@ def _ref(p: Dict[str, Any]) -> Optional[str]:
 
 
 def format_candidates(products: List[Dict[str, Any]], rag_limit: int = 5, web_limit: int = 3) -> str:
-    """Real bug fixed here: products is [rag..., web...] (retriever_node
-    extends rag first, web second), and rag always fills up to 5 on its
-    own -- a single products[:limit] silently showed the Answerer zero web
-    candidates on every query that retrieved both, regardless of relevance.
-    Fixed by taking each source's own top slice rather than truncating the
-    combined list -- rag gets more slots (primary source, plan.use_rag is
-    always True) than web (conditional/supplementary, plan.use_web only
-    sometimes). web_limit=3, not 5: Tavily's own weakest results tail into
-    generic category/listing pages rather than specific products (observed
-    directly, not assumed) -- capping at 3 naturally excludes that tail
-    rather than feeding it to the LLM as if it were a real candidate."""
+    """Takes each source's own top slice rather than truncating the combined
+    list -- products is [rag..., web...] and rag always fills all 5 slots on
+    its own, so a plain products[:limit] silently hid every web candidate
+    from the LLM. web_limit=3, not 5: Tavily's weakest results tail into
+    generic listing pages rather than specific products."""
     if not products:
         return "(no candidate products retrieved)"
     rag = [p for p in products if p.get("source", "rag") == "rag"][:rag_limit]
@@ -105,9 +81,7 @@ def format_candidates(products: List[Dict[str, Any]], rag_limit: int = 5, web_li
 
 def grounding_check(result: AnswererOutput, products: List[Dict[str, Any]]) -> AnswererOutput:
     """Deterministic, not LLM-judged: every cited ref must be one Retriever
-    actually returned (checked against real product refs, rag or web --
-    the LLM doesn't have to classify which kind, see module docstring). Any
-    miss discards the whole answer."""
+    actually returned. Any miss discards the whole answer."""
     valid_refs = {_ref(p) for p in products if _ref(p)}
     if any(c.ref not in valid_refs for c in result.citations):
         return AnswererOutput(answer=UNGROUNDED_FALLBACK, citations=[])
@@ -115,12 +89,9 @@ def grounding_check(result: AnswererOutput, products: List[Dict[str, Any]]) -> A
 
 
 def resolve_citations(citations: List[AnswererCitation], products: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Builds the real citation objects GraphState.citations actually holds
-    -- source/doc_id/url/title -- from ground-truth product data, looked up
-    by ref. Only ever called after grounding_check has passed, so every ref
-    here is guaranteed to match a real product. This is what makes "private
-    doc_ids and live URLs, clearly distinguished" (§5.2) possible -- source
-    is derived by lookup, never trusted from the LLM's own output."""
+    """Builds {source, doc_id, url, title} from ground-truth product data,
+    looked up by ref -- only called after grounding_check, so every ref is
+    guaranteed to match. Source is derived by lookup, not the LLM's claim."""
     by_ref = {_ref(p): p for p in products if _ref(p)}
     resolved = []
     for c in citations:
@@ -136,14 +107,9 @@ def resolve_citations(citations: List[AnswererCitation], products: List[Dict[str
 
 def scrub_raw_ids(result: AnswererOutput) -> AnswererOutput:
     """Deterministic backstop for the prompt's "never speak a ref" rule --
-    not trusted to the prompt alone, because it isn't reliable enough on its
-    own: verified this actually happens (a doc_id spoken mid-sentence, e.g.
-    "...cheapest option, doc_id 9f0435b9a121e69b6aaf04113a800992"),
-    reproducibly, in ~40% of runs of one specific low-context query before
-    this existed -- a real, measured failure rate, not a hypothetical one.
-    Also catches a leaked url now, since a `ref` can be either. Same "no
-    partial credit" posture as grounding_check: any leak discards the whole
-    answer rather than trying to surgically strip it out."""
+    the prompt alone wasn't reliable enough (a doc_id was spoken mid-sentence
+    in ~40% of runs on one low-context query before this existed). Catches a
+    leaked url too, since a ref can be either; any leak discards the answer."""
     if _RAW_ID_RE.search(result.answer):
         return AnswererOutput(answer=RAW_ID_LEAK_FALLBACK, citations=[])
     return result

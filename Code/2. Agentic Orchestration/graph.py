@@ -2,24 +2,15 @@
 Compiles the LangGraph StateGraph (§2.1) from the real node implementations
 in router.py/planner.py/retriever.py/answerer.py.
 
-Node graph: Router -> Planner -> Retriever -> Answerer/Critic, with a
-safety_flag branch out of Router straight to safe_refusal (skips
-Planner/Retriever/Answerer entirely).
+Node graph: Router -> Planner -> Retriever -> Answerer/Critic, with one
+conditional edge out of Router: to safe_refusal if safety_flag is set,
+else to Planner (skipping Planner/Retriever/Answerer entirely). The
+rag-vs-web decision is NOT a second edge -- it's `plan['use_web']` data,
+read as a plain `if` inside Retriever. See Architecture/graph_state_flow.mermaid.
 
-Only one graph-level conditional edge: Router -> safe_refusal vs.
-Router -> Planner, on whether safety_flag got set. The rag-vs-web decision
-is NOT a second edge -- it's plan['use_web'] data, read as a plain `if`
-inside the Retriever node (a choice within one node, not a choice between
-nodes). See Architecture/graph_state_flow.mermaid.
-
-This module is what a real importer (§2.7's testing notebook, and eventually
-§5's Streamlit UI) imports -- see the design notebook's file-format note.
-
-**Invoke with `await graph.ainvoke(...)`, not `graph.invoke(...)`** -- since
-the Retriever swap, retriever_node is async (it calls MCP tools through a
-persistent client, mcp_client.py). LangGraph runs mixed sync/async nodes in
-one graph fine (verified directly, not assumed), but the whole graph has to
-be driven with the async entrypoint once any node is async.
+**Invoke with `await graph.ainvoke(...)`, not `graph.invoke(...)`** --
+retriever_node is async (calls MCP tools via a persistent client,
+mcp_client.py), so the whole graph needs the async entrypoint.
 """
 
 from typing import Literal

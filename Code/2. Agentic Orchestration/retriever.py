@@ -1,35 +1,17 @@
 """
-Retriever node (§2.4). search() is ported from §1.4's hybrid retrieval
-notebook (same reuse pattern §1.5 already used on §1.4: redefined, not
-imported -- notebooks can't import each other). Kept here, still used by
-Code/3. MCP Server & Tools/rag_search_tool.py -- retriever_node itself no
-longer calls it directly (see below), but the MCP server does.
+Retriever node (§2.4). `search()` is ported from §1.4's hybrid retrieval
+notebook and still used directly by `Code/3. MCP Server & Tools/rag_search_tool.py`
+-- `retriever_node` itself calls it only indirectly, through MCP.
 
-**The swap (§2.4's "call MCP tools only" item, closed):** retriever_node
-now calls rag.search and web.search through the persistent MCP client
-(mcp_client.py) instead of calling search() in-process. Real behavior, no
-fabricated scenarios:
-- rag.search always runs (plan.use_rag is always True)
-- web.search only runs if plan.use_web -- both tools are real now (§3.2,
-  §3.3), so this is a genuine conditional call, not a stubbed branch
-- conflicts get reconciled for real when both tools returned results (see
-  reconcile()) -- title-similarity matching (difflib, no new dependency),
-  flags price disagreements rather than silently picking one source
-- category is still accepted and forwarded (unlike the pre-swap version,
-  which dropped it client-side) -- the server itself now returns an
-  explicit warning when it can't apply it (§3.2), so the client doesn't
-  need to duplicate that logic anymore
-- material/quantity are dropped client-side -- the MCP tool's schema
-  doesn't declare those parameters at all, so forwarding them would be a
-  validation error, not a graceful no-op
-- web products get `doc_id=None` (they only have a `url`, no private-catalog
-  doc_id) -- this used to be a known gap ("Answerer's citation schema is
-  doc_id-first, a web result is unlikely to actually get cited"), since
-  resolved: Answerer's citation model (answerer.py) now cites by a generic
-  `ref` -- doc_id for rag, url for web -- resolved to the right source by
-  looking the ref up against real products, not by trusting the LLM to
-  self-classify. `doc_id=None` here is exactly what makes that resolve to
-  `source: "web"` instead of `"rag"`.
+`retriever_node` calls `rag.search` (always) and `web.search` (only if
+`plan.use_web`) through the persistent MCP client (`mcp_client.py`), then
+reconciles the two result sets (`reconcile()`) by title similarity, flagging
+price disagreements rather than silently picking one source. `category` is
+forwarded to the tool, which warns rather than silently dropping it if it
+can't apply the filter; `material`/`quantity` are dropped client-side since
+the tool's schema doesn't accept them. Web products get `doc_id=None`
+(only a `url`) -- Answerer (§2.5) uses that to resolve citations to the
+right source without trusting the LLM to self-classify.
 """
 
 import os
@@ -190,7 +172,7 @@ async def retriever_node(state: GraphState) -> GraphState:
             web_result = await mcp_client.call_tool("web.search", {"query": state["query"]})
             web_products = [
                 {
-                    "doc_id": None,  # known gap -- see module docstring
+                    "doc_id": None,  # web results only ever have a url -- see module docstring
                     "title": r.get("title"),
                     "price": r.get("price"),
                     "brand": None,

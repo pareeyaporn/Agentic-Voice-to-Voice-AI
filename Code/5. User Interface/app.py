@@ -1,37 +1,23 @@
 """
-Streamlit UI (§5). `.py` per the file-format convention (reason (b): `streamlit
-run` requires a `.py` entrypoint, not a notebook).
+Streamlit UI (§5). `.py` because `streamlit run` requires an entrypoint file.
 
-Wires together every prior section for real: mic/file audio -> asr.py (§4.1)
--> graph.py (§2, via a persistent MCP session, §2.4's Retriever swap) -> the
-Answerer's text -> tts.py (§4.2) -> playback. Nothing here re-derives logic
-those modules already own; this file is orchestration + rendering only.
+Wires every prior section together: mic/file audio -> asr.py (§4.1) ->
+graph.py (§2, via a persistent MCP session) -> Answerer's text -> tts.py
+(§4.2) -> playback. This file is orchestration + rendering only; no logic
+is re-derived from the modules it imports.
 
-**The async bridge (see async_runtime.py):** Streamlit is sync and
-re-executes this script's top-level code on every rerun (every widget
-interaction), but `graph.py` is async and holds a persistent MCP
-`ClientSession` for the process's lifetime (§2.4). `asyncio.run()` per rerun
-would silently defeat that -- tested directly (see async_runtime.py's
-docstring) and confirmed it would pay the ~0.2s MCP startup cost on every
-single query again. Fixed with one background event-loop thread for the
-whole process; every rerun submits its coroutine to that same loop. Verified
-directly, not assumed: two independent `run_async()` calls reused the exact
-same `ClientSession` object (`id()` identical) and the second call was ~3x
-faster than the first.
+Async bridge: Streamlit re-runs this script's top level on every widget
+interaction, but graph.py is async and holds a persistent MCP session for
+the process's lifetime. `asyncio.run()` per rerun would open a new event
+loop each time and silently break that persistence. `async_runtime.py`
+fixes this with one background event-loop thread for the process's life.
 
-**Config module naming:** both this app and §4's modules need §2's `config`
-module and §4's own config -- imported under different names on purpose
-(`config` for §2, `speech_config` for §4's). A same-named bare `config.py`
-in both directories was tested directly and found to silently collide (the
-second import just reuses the first's cached module) -- §4's was renamed to
-`speech_config.py` to fix this at the source; see its own docstring.
+Config imports: §2's `config` and §4's `speech_config` are separate modules
+by design -- see speech_config.py's docstring for why a shared name collides.
 
-**Mock-data mode (§5.1's own explicit requirement):** a sidebar toggle that
-swaps every real call (ASR, the graph/LLM/MCP, TTS) for canned, schema-real
-data -- $0, no network, so UI layout/copy can be iterated on without spending
-API money on every rerun, and doubles as the demo-mode fallback called out
-in the backlog's Cross-Cutting Risks ("have a demo mode that falls back...
-if external APIs are down during the live demo").
+Mock-data mode (sidebar toggle, default on) swaps every real call for
+canned data, so the UI can be explored at $0 and doubles as a demo-mode
+fallback if live APIs are down.
 """
 
 import os
@@ -67,11 +53,9 @@ except ImportError:
     _MIC_AVAILABLE = False
 
 
-# --- Mock data (§5.1's required mock-data mode) -----------------------------------
-# Real product records (pulled live from search(), $0 cost, no LLM) and a schema-
-# accurate synthetic web result -- not invented data shaped by hand, except the
-# web entry, which is clearly synthetic since no web.search call happened to fetch
-# a real one for this specific canned example (labeled MOCK throughout the UI).
+# --- Mock data (§5.1) ---------------------------------------------------------------
+# Rag entries are real product records pulled from search() ($0 cost). The one web
+# entry is synthetic, labeled MOCK.
 _MOCK_LUNCHBOX_PRODUCTS = [
     {
         "doc_id": "7c3f2bf59a4276a1812e837fcce8d353",
@@ -253,10 +237,8 @@ def render_comparison_table(products: list) -> None:
     if not products:
         st.info("No products retrieved for this query.")
         return
-    # "features" is intentionally not a column -- §3.2's real finding: it was never
-    # stored as retrievable Chroma metadata (only used to build the embedding text),
-    # so it isn't available to show, not just omitted by choice. rating/ingredients
-    # are dropped per §1.1 (100% empty in this dataset), per the backlog's own note.
+    # "features" isn't a column -- never stored as retrievable metadata (§3.2).
+    # rating/ingredients are dropped -- 100% empty in this dataset (§1.1).
     rows = []
     for p in products:
         rows.append({

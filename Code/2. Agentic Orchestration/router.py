@@ -1,14 +1,12 @@
 """
-Router node (§2.2): one structured-output LLM call does intent classification,
-constraint extraction, and safety-flag detection together.
+Router node (§2.2): one structured-output LLM call does intent
+classification, constraint extraction, and safety-flag detection together.
 
 System prompt: Code/6. Prompts & Documentation/router_system_prompt.md
-(§6 Prompt Disclosure -- every node's prompt traces to its own versioned file).
 
-Known gap, carried over from the design notebook: `intent` is computed but not
-persisted to GraphState (kept to the 8-field schema, §2.1). An out_of_scope
-query currently flows through Planner/Retriever/Answerer like any other rather
-than short-circuiting -- revisit if that proves unsatisfying in practice.
+Known gap: `intent` is computed but not persisted to GraphState (kept to
+the 8-field schema, §2.1) -- an out_of_scope query still flows through
+Planner/Retriever/Answerer instead of short-circuiting.
 """
 
 import os
