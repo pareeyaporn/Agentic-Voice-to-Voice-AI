@@ -54,7 +54,7 @@ graph TD
     M -->|Show Table| N["Comparison Table<br/>Title, Price, Brand, Features"]
     M -->|Show Log| O["Agent Log<br/>What happened<br/>at each node"]
 
-    M -->|Answer Text| P["TTS<br/>OpenAI/ElevenLabs<br/>tts.py"]
+    M -->|Answer Text| P["TTS<br/>OpenAI TTS<br/>tts.py"]
     P -->|Audio Output| Q["🔊 Speaker/Audio Player"]
 
     Q -->|Play| A
@@ -67,10 +67,10 @@ The [Architecture](Architecture/) folder also has [architecture_comparison.merma
 | Component | Role |
 |---|---|
 | **Agentic Orchestration (LangGraph)** | Router (intent classifier) → Planner (source/field selection) → Retriever (agentic RAG via MCP) → Answerer/Critic (grounded synthesis + safety) |
-| **ASR** | Speech-to-text via Whisper (or comparable); fragment-based (record → transcribe) or streaming |
+| **ASR** | Speech-to-text via local `faster-whisper` (free, no API key); fragment-based (record → transcribe), streaming not attempted |
 | **Agentic RAG** | Hybrid vector + metadata search over the Amazon Product Dataset 2020, indexed in Chroma as two collections: `products_home_kitchen` (706-row demo slice) and `products_all` (9,930 rows, full catalog) |
 | **MCP Server** | One server, two tools — `rag.search` (private catalog) and `web.search` (live comparison via Tavily) — with tool discovery, schemas, caching (TTL 60–300s), and logging |
-| **TTS** | Spoken answer ≤15s, fragment-based or streaming (OpenAI TTS, ElevenLabs, Azure Speech, Amazon Polly, Coqui) |
+| **TTS** | Spoken answer ≤15s via OpenAI TTS (provider-swappable by construction, only the OpenAI path is built); fragment-based, streaming not attempted |
 | **UI** | Streamlit (or React): mic input, live transcript, agent step log, comparison table, citations, Play-TTS button |
 | **LLM** | Model-agnostic — swappable via environment variables/config (OpenAI, Anthropic, Gemini, Bedrock, or open-weight Llama/Mistral/Qwen/Phi) |
 
@@ -165,7 +165,10 @@ Code/
 │   │                                 #   (doc_id for rag, url for web), resolved to
 │   │                                 #   source/doc_id/url by lookup, never trusted from the
 │   │                                 #   LLM's own claim — what makes citations "clearly
-│   │                                 #   distinguished" (§5.2) actually possible
+│   │                                 #   distinguished" (§5.2) actually possible.
+│   │                                 #   format_candidates() splits 5 rag + 3 web (not a
+│   │                                 #   combined truncation — that silently hid every web
+│   │                                 #   candidate from the LLM regardless of relevance)
 │   └── graph.py                      # wires the above into the compiled `graph` (async since
 │                                     #   the swap — invoke via `await graph.ainvoke(...)`) —
 │                                     #   what §2.7 imports today, §5's UI will import later
@@ -184,7 +187,18 @@ Code/
 │   ├── 3.3 web search tool test.ipynb            # 1 real Tavily call (via real MCP server)
 │   │                                             #   + 6 mocked cases (caching/backoff/allowlist)
 │   └── 3.4 cross-cutting test.ipynb               # logging/scrubbing/typed-error tests
-├── 4. Speech (ASR + TTS)/           # (planned) Whisper (or comparable) + TTS provider
+├── 4. Speech (ASR + TTS)/
+│   ├── config.py                       # own config.py (ASR/TTS are a disjoint concern from
+│   │                                    #   §2's LLM config) — ASR_*/TTS_* env vars, .env loading
+│   ├── asr.py                          # transcribe() (§4.1) — local faster-whisper, lazy
+│   │                                    #   process-wide singleton model, typed ASRError
+│   ├── tts.py                          # synthesize() (§4.2) — OpenAI TTS, deterministic <=15s
+│   │                                    #   budget enforcement (measured duration, not word
+│   │                                    #   count — see the real wave-header bug this caught),
+│   │                                    #   typed TTSError
+│   └── 4.1-4.2 speech smoke test.ipynb # real TTS->ASR round trip, budget-correction case
+│                                        #   exercised for real, multilingual smoke test
+│                                        #   (synthesized audio, stated limitation), error paths
 ├── 5. User Interface/               # (planned) Streamlit app
 └── 6. Prompts & Documentation/
     ├── router_system_prompt.md          # Router's system prompt (§6 Prompt Disclosure)
@@ -223,7 +237,7 @@ For the granular, checkable engineering task list (per component, per checkpoint
 
 ## Status
 
-🚧 Early stage — architecture and team planning are in place; implementation has not started yet (`Code/` is currently empty).
+🚧 In progress — §1 (Data Pipeline & Indexing), §2 (Agentic Orchestration), §3 (MCP Server & Tools), and §4 (Speech: ASR + TTS) are implemented and tested; §5 (User Interface) has not started.
 
 ## License
 

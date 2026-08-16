@@ -77,11 +77,24 @@ def _ref(p: Dict[str, Any]) -> Optional[str]:
     return p.get("doc_id") or p.get("url")
 
 
-def format_candidates(products: List[Dict[str, Any]], limit: int = 5) -> str:
+def format_candidates(products: List[Dict[str, Any]], rag_limit: int = 5, web_limit: int = 3) -> str:
+    """Real bug fixed here: products is [rag..., web...] (retriever_node
+    extends rag first, web second), and rag always fills up to 5 on its
+    own -- a single products[:limit] silently showed the Answerer zero web
+    candidates on every query that retrieved both, regardless of relevance.
+    Fixed by taking each source's own top slice rather than truncating the
+    combined list -- rag gets more slots (primary source, plan.use_rag is
+    always True) than web (conditional/supplementary, plan.use_web only
+    sometimes). web_limit=3, not 5: Tavily's own weakest results tail into
+    generic category/listing pages rather than specific products (observed
+    directly, not assumed) -- capping at 3 naturally excludes that tail
+    rather than feeding it to the LLM as if it were a real candidate."""
     if not products:
         return "(no candidate products retrieved)"
+    rag = [p for p in products if p.get("source", "rag") == "rag"][:rag_limit]
+    web = [p for p in products if p.get("source") == "web"][:web_limit]
     lines = []
-    for p in products[:limit]:
+    for p in rag + web:
         price = f"${p['price']:.2f}" if p.get("price") is not None else "price unknown"
         source = p.get("source", "rag")
         lines.append(
