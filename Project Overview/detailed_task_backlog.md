@@ -68,7 +68,7 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 - [x] Intent classification (search/comparison/follow-up/out-of-scope) via one structured-output LLM call. Known gap: `intent` isn't acted on — an out-of-scope query still flows through the graph instead of short-circuiting
 - [x] Constraint extraction (budget/material/brand/category/quantity) in the same call
 - [x] Safety-flag detection → routes to `safe_refusal`, verified end-to-end
-- [x] Prompt: [router_system_prompt.md](../Code/6.%20Prompts%20%26%20Documentation/router_system_prompt.md)
+- [x] Prompt: [router_system_prompt.md](../Code/6.%20Prompts%20%26%20Documentation/router_system_prompt.md) — now includes a 4-row few-shot examples table (added after the charter re-read found the Prompt Disclosure line explicitly expects few-shot examples, and none of the 3 prompts originally had any). Verified with real calls after adding: still parses correctly, and the safety-flag example's exact wording showed up in a real follow-up call's output
 - [x] Model: `gpt-5.6-luna`
 
 ### 2.3 Planner Node — `CP1` → `CP2`
@@ -91,7 +91,7 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 - [x] Grounding check: deterministic — every cited ref must match a real retrieved product, else the whole answer is discarded for a fixed fallback
 - [x] No separate safety re-check — Router already filters unsafe queries before Answerer runs
 - [x] ~40-word length budget enforced by truncation (can cut mid-sentence — known rough edge)
-- [x] Prompt: [answerer_critic_system_prompt.md](../Code/6.%20Prompts%20%26%20Documentation/answerer_critic_system_prompt.md)
+- [x] Prompt: [answerer_critic_system_prompt.md](../Code/6.%20Prompts%20%26%20Documentation/answerer_critic_system_prompt.md) — now includes 2 worked examples (rag-only, mixed rag+web) showing candidates in, `{answer, citations}` out, reinforcing the "never speak a ref in `answer`" rule concretely rather than only stating it
 - [x] **Fixed:** the model occasionally spoke a raw `doc_id` aloud (~40% of runs on one low-context query) — prompt tension between "cite by doc_id" and "don't recite IDs." Fixed with a clearer prompt (dropped the leak to 0/6) plus a deterministic regex backstop, `scrub_raw_ids()`
 - [x] **Citation schema fix:** `doc_id` was required, so web results (url-only) could never be cited. Replaced with a generic `ref` field (doc_id or url), resolved to `{source, doc_id, url, title}` by lookup against real products — the LLM never self-classifies rag vs. web
 - [x] **Second, deeper bug:** `format_candidates()` truncated to the first 5 products, and rag always filled all 5 — so web products never reached the LLM even after the schema fix. Fixed by giving each source its own slice (5 rag + 3 web). Verified: first web-sourced citation appeared after this fix

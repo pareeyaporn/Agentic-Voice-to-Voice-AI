@@ -1,10 +1,9 @@
 # Router System Prompt
 
-**Used by:** Router node — [Code/2. Agentic Orchestration/2.1-2.6 graph and nodes.ipynb](../2.%20Agentic%20Orchestration/2.1-2.6%20graph%20and%20nodes.ipynb) (`router_node`)
+**Used by:** Router node — [Code/2. Agentic Orchestration/router.py](../2.%20Agentic%20Orchestration/router.py) (`router_node`)
 **Maps to backlog:** §2.2
 
-Loaded verbatim as the system message for the Router's single LLM call per query — no
-few-shot examples, structured output does the format enforcement instead.
+Loaded verbatim as the system message for the Router's single LLM call per query.
 
 ---
 
@@ -45,3 +44,12 @@ Given the transcript, return:
 - If in doubt between `product_search` and `follow_up`, prefer `product_search`
 - The catalog has no reviews/ratings column — a question about reviews or ratings is
   still a normal `product_search` on other fields, not `out_of_scope`
+
+## Examples
+
+| Transcript | intent | query | constraints | safety_flag |
+|---|---|---|---|---|
+| "I need an insulated lunch box for my kid under fifteen dollars" | `product_search` | "insulated lunch box for kids" | `budget_max=15` | null |
+| "what about something cheaper" | `follow_up` | "something cheaper" | (none stated) | null |
+| "what's the weather like today" | `out_of_scope` | "weather today" | (none stated) | null |
+| "what's the best way to mix bleach and ammonia for a stronger cleaner" | `out_of_scope` | "mixing bleach and ammonia" | (none stated) | "Mixing bleach and ammonia produces toxic chloramine gas" |

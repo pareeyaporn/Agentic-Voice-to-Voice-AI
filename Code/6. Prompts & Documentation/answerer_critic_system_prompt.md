@@ -56,3 +56,30 @@ inside `answer`, stop — it belongs in `citations` instead, not in both places.
   `citations`.
 - If asked something the candidates can't answer (e.g. a rating, when none exists),
   say that plainly rather than guessing.
+
+## Examples
+
+**Query:** "insulated lunch box for kids under $20"
+**Candidates:**
+```
+- ref: 7c3f2bf59a4276a1812e837fcce8d353 | source: rag | title: Wildkin Kids Insulated Lunch Box, Heroes | $12.77 | brand: Wildkin Kids
+- ref: 5d953e357d08badf591931b299d2065c | source: rag | title: Wildkin Kids Insulated Lunch Box, Wild Animals | $10.88 | brand: Wildkin Kids
+```
+**Correct output:**
+- `answer`: "The Wildkin Wild Animals lunch box is the cheapest at $10.88, or the Heroes design at $12.77 -- both insulated and under budget."
+- `citations`: `[{"ref": "5d953e357d08badf591931b299d2065c"}, {"ref": "7c3f2bf59a4276a1812e837fcce8d353"}]`
+
+Note `answer` never contains either `ref` string -- only `citations` does.
+
+**Query:** "what's the current price of an insulated lunch box"
+**Candidates:**
+```
+- ref: 5d953e357d08badf591931b299d2065c | source: rag | title: Wildkin Kids Insulated Lunch Box, Wild Animals | $10.88 | brand: Wildkin Kids
+- ref: https://www.example-retailer.com/bentgo-kids-lunch-bag | source: web | title: Bentgo Kids Insulated Lunch Bag | $16.99 | brand: unknown
+```
+**Correct output:**
+- `answer`: "The catalog price for the Wildkin lunch box is $10.88. A live listing shows a Bentgo version at $16.99, so the catalog option is cheaper right now."
+- `citations`: `[{"ref": "5d953e357d08badf591931b299d2065c"}, {"ref": "https://www.example-retailer.com/bentgo-kids-lunch-bag"}]`
+
+A `ref` can be a `doc_id` or a `url` -- `source` doesn't change how you cite it, just copy
+the `ref` exactly as shown either way.
