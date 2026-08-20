@@ -9,8 +9,12 @@
   --error-text: #9b1c1c;
   --glass: rgba(255, 255, 255, 0.55);
   --glass-border: rgba(255, 255, 255, 0.75);
+  --divider: rgba(255, 255, 255, 0.6);
+  --table-divider: rgba(140, 150, 200, 0.18);
+  --code-bg: rgba(255, 255, 255, 0.55);
   --shadow: 0 8px 32px rgba(80, 90, 180, 0.12);
   --radius: 20px;
+  --voice-level: 0; /* live loudness 0..1, written by sound.js meters */
 }
 
 * { box-sizing: border-box; }
@@ -44,6 +48,7 @@ body {
 
 /* --- Top bar -------------------------------------------------------------- */
 .topbar { display: flex; justify-content: space-between; align-items: center; }
+.topbar-actions { display: flex; gap: 8px; }
 .brand { font-weight: 600; font-size: 0.9rem; letter-spacing: 0.02em; }
 .icon-btn {
   width: 36px; height: 36px;
@@ -65,7 +70,7 @@ body {
 .link-btn { border: none; background: none; color: var(--accent); cursor: pointer; padding: 8px 0 0; font-size: 0.82rem; }
 .prompt-log { max-height: 280px; overflow-y: auto; font-size: 0.72rem; margin-top: 6px; }
 .prompt-entry pre {
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--code-bg);
   border-radius: 8px;
   padding: 8px;
   white-space: pre-wrap;
@@ -84,13 +89,31 @@ body {
 }
 .greeting { font-size: 1.5rem; font-weight: 650; margin: 0 auto 22px; max-width: 420px; }
 
-/* --- The orb --------------------------------------------------------------- */
-.orb-wrap { position: relative; width: 190px; height: 190px; margin: 0 auto; }
+/* --- The orb (tappable) ------------------------------------------------------ */
+.orb-area { text-align: center; }
+.orb-btn {
+  position: relative;
+  display: block;
+  width: 190px; height: 190px;
+  margin: 0 auto;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.2s ease;
+}
+.orb-btn:hover:not(:disabled) { transform: scale(1.04); }
+.orb-btn:active:not(:disabled) { transform: scale(0.98); }
+.orb-btn:disabled { cursor: default; }
+.orb-btn:focus-visible { outline: 3px solid rgba(91, 108, 255, 0.5); outline-offset: 10px; border-radius: 50%; }
+
 .orb-glow {
-  position: absolute; inset: -30px;
+  position: absolute; inset: -34px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 130, 205, 0.55) 0%, rgba(130, 150, 255, 0.32) 45%, transparent 70%);
   filter: blur(12px);
+  transition: opacity 0.4s ease;
 }
 .orb {
   position: absolute; inset: 0;
@@ -124,30 +147,68 @@ body {
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.65);
   opacity: 0;
+  pointer-events: none;
 }
+.orb-hint { font-size: 0.9rem; font-weight: 500; color: var(--text); opacity: 0.75; margin: 16px 0 0; min-height: 1.3em; }
 
 @keyframes breathe { 50% { transform: scale(1.035); } }
 @keyframes drift-a { to { transform: translate(24%, -14%) scale(1.12); } }
 @keyframes drift-b { to { transform: translate(-20%, 22%) scale(1.08); } }
 @keyframes drift-c { to { transform: translate(-12%, -20%) scale(1.15); } }
 
-/* orb states */
-.orb-listening .orb { animation: breathe 1.1s ease-in-out infinite; }
+/* -- orb states -- */
+/* listening: audio-reactive -- the orb swells with the user's actual voice
+   (scale driven by --voice-level from the mic meter, not a fixed rhythm) */
+.orb-listening .orb {
+  animation: none;
+  transform: scale(calc(1 + var(--voice-level) * 0.14));
+  transition: transform 0.07s linear;
+}
 .orb-listening .orb-blob-a { animation-duration: 2.2s; }
 .orb-listening .orb-glow {
-  background: radial-gradient(circle, rgba(255, 120, 190, 0.6) 0%, rgba(255, 140, 200, 0.3) 45%, transparent 70%);
+  inset: -44px;
+  background: radial-gradient(circle, rgba(255, 100, 185, 0.75) 0%, rgba(200, 120, 255, 0.4) 45%, transparent 72%);
 }
+.orb-listening .orb-ring {
+  border-color: rgba(255, 120, 195, 0.75);
+  animation: ripple 1.5s ease-out infinite;
+}
+.orb-listening .orb-ring-2 { animation-delay: 0.5s; }
+.orb-listening .orb-ring-3 { animation-delay: 1s; }
+
+/* thinking: everything swirls faster, glow shifts violet */
+.orb-thinking .orb { animation: breathe 1.4s ease-in-out infinite; }
 .orb-thinking .orb-blob-a, .orb-thinking .orb-blob-b, .orb-thinking .orb-blob-c {
-  animation-duration: 1.6s;
+  animation-duration: 1.4s;
 }
-.orb-thinking .orb { animation: breathe 1.6s ease-in-out infinite; }
-.orb-speaking .orb-ring { animation: ripple 1.6s ease-out infinite; }
-.orb-speaking .orb-ring-2 { animation-delay: 0.8s; }
+.orb-thinking .orb-glow {
+  inset: -40px;
+  background: radial-gradient(circle, rgba(150, 120, 255, 0.65) 0%, rgba(120, 160, 255, 0.35) 45%, transparent 70%);
+  animation: glow-pulse 1.4s ease-in-out infinite;
+}
+
+/* speaking: audio-reactive to the TTS voice, ripples in the brand blue */
+.orb-speaking .orb {
+  animation: none;
+  transform: scale(calc(1 + var(--voice-level) * 0.1));
+  transition: transform 0.07s linear;
+}
+.orb-speaking .orb-ring {
+  border-color: rgba(140, 155, 255, 0.75);
+  animation: ripple 1.6s ease-out infinite;
+}
+.orb-speaking .orb-ring-2 { animation-delay: 0.55s; }
+.orb-speaking .orb-ring-3 { animation-delay: 1.1s; }
+.orb-speaking .orb-glow {
+  inset: -40px;
+  background: radial-gradient(circle, rgba(130, 150, 255, 0.6) 0%, rgba(180, 140, 255, 0.35) 45%, transparent 70%);
+}
 
 @keyframes ripple {
-  0% { transform: scale(1); opacity: 0.7; }
-  100% { transform: scale(1.45); opacity: 0; }
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.55); opacity: 0; }
 }
+@keyframes glow-pulse { 50% { opacity: 0.55; } }
 
 /* --- Example chips ---------------------------------------------------------- */
 .chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 22px; }
@@ -161,6 +222,7 @@ body {
 }
 .chip:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(80, 90, 180, 0.2); }
 .chip:disabled { opacity: 0.5; cursor: not-allowed; }
+.chip-active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 
 /* --- Prompt bar --------------------------------------------------------------- */
 .prompt-bar {
@@ -233,7 +295,7 @@ body {
   padding: 8px 0;
   font-size: 0.85rem;
   animation: fade-in 0.3s ease;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+  border-bottom: 1px solid var(--divider);
 }
 .step:last-child { border-bottom: none; }
 .step-icon { flex-shrink: 0; }
@@ -262,7 +324,7 @@ audio { width: 100%; margin-top: 12px; height: 38px; }
 /* table */
 .table-scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(140, 150, 200, 0.18); }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--table-divider); }
 th { color: var(--muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; }
 tr:last-child td { border-bottom: none; }
 
@@ -271,7 +333,7 @@ tr:last-child td { border-bottom: none; }
 .citations li { padding: 5px 0; word-break: break-word; }
 .citations a { color: var(--accent); }
 .citations code {
-  background: rgba(255, 255, 255, 0.55);
+  background: var(--code-bg);
   padding: 2px 6px;
   border-radius: 6px;
   font-size: 0.72rem;
@@ -285,7 +347,71 @@ tr:last-child td { border-bottom: none; }
 .muted { color: var(--muted); font-size: 0.85rem; }
 .warn-text { color: var(--warn-text); font-size: 0.8rem; }
 
+/* --- Word-synced answer reveal (words light up as the voice reads them) ------- */
+.w-on { opacity: 1; transition: opacity 0.25s ease; }
+.w-off { opacity: 0.18; }
+
+/* --- Follow-up suggestions ----------------------------------------------------- */
+.follow-ups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.chip-small { padding: 6px 12px; font-size: 0.78rem; }
+
+/* --- Session history ----------------------------------------------------------- */
+.history { list-style: none; margin: 0; padding: 0; }
+.history li { padding: 10px 0; border-bottom: 1px solid var(--divider); }
+.history li:last-child { border-bottom: none; }
+.history-q { margin: 0 0 4px; font-size: 0.85rem; font-weight: 600; }
+.history-a { margin: 0; font-size: 0.85rem; color: var(--muted); }
+
 @media (max-width: 560px) {
   .greeting { font-size: 1.25rem; }
-  .orb-wrap { width: 150px; height: 150px; }
+  .orb-btn { width: 150px; height: 150px; }
 }
+
+/* --- Dark mode ------------------------------------------------------------------ */
+/* Applied via data-theme on <html> -- default follows the OS preference (set
+   before first paint in index.html), and the topbar toggle overrides it.
+   Glow and ripples read far better on dark; same layout, palette swapped
+   via the custom properties. */
+  :root[data-theme='dark'] {
+    --text: #e9ebfa;
+    --muted: #9aa2c7;
+    --accent: #7c8aff;
+    --warn-bg: rgba(113, 84, 10, 0.45);
+    --warn-text: #fde68a;
+    --error-bg: rgba(127, 29, 29, 0.5);
+    --error-text: #fecaca;
+    --glass: rgba(28, 30, 52, 0.55);
+    --glass-border: rgba(130, 140, 210, 0.22);
+    --divider: rgba(140, 150, 220, 0.14);
+    --table-divider: rgba(140, 150, 220, 0.18);
+    --code-bg: rgba(255, 255, 255, 0.08);
+    --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+[data-theme='dark'] body {
+  background:
+    radial-gradient(1100px 700px at 15% -10%, #29245c 0%, transparent 60%),
+    radial-gradient(900px 650px at 110% 15%, #47203f 0%, transparent 55%),
+    radial-gradient(1000px 800px at 50% 115%, #0f3236 0%, transparent 55%),
+    linear-gradient(160deg, #0d0f20 0%, #131530 45%, #1a142e 100%);
+  background-attachment: fixed;
+}
+[data-theme='dark'] .orb {
+  background: linear-gradient(140deg, #1d3a32 0%, #2c2350 100%);
+  box-shadow:
+    inset 0 0 22px rgba(255, 255, 255, 0.12),
+    0 18px 55px rgba(0, 0, 0, 0.5);
+}
+[data-theme='dark'] .orb-glow {
+  background: radial-gradient(circle, rgba(255, 110, 195, 0.5) 0%, rgba(124, 138, 255, 0.3) 45%, transparent 70%);
+}
+[data-theme='dark'] .icon-btn { color: var(--text); }
+[data-theme='dark'] .prompt-input { color: var(--text); }
+[data-theme='dark'] .mic-btn { background: #34394f; }
+[data-theme='dark'] .mic-recording { background: var(--danger); }
+[data-theme='dark'] audio { color-scheme: dark; }
