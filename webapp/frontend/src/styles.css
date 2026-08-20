@@ -1,0 +1,291 @@
+:root {
+  --text: #232842;
+  --muted: #6f7590;
+  --accent: #5b6cff;
+  --danger: #e5484d;
+  --warn-bg: rgba(255, 244, 214, 0.85);
+  --warn-text: #8a6100;
+  --error-bg: rgba(255, 226, 226, 0.9);
+  --error-text: #9b1c1c;
+  --glass: rgba(255, 255, 255, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --shadow: 0 8px 32px rgba(80, 90, 180, 0.12);
+  --radius: 20px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+  /* Alvo-style pastel wash: periwinkle -> ice blue -> blush */
+  background:
+    radial-gradient(1100px 700px at 15% -10%, #c9d4ff 0%, transparent 60%),
+    radial-gradient(900px 650px at 110% 15%, #ffd9ec 0%, transparent 55%),
+    radial-gradient(1000px 800px at 50% 115%, #c4f0e4 0%, transparent 55%),
+    linear-gradient(160deg, #dfe7fd 0%, #e8f1fb 45%, #f4e9f7 100%);
+  background-attachment: fixed;
+}
+
+.page { max-width: 760px; margin: 0 auto; padding: 18px 20px 80px; }
+
+/* --- Glassmorphism ------------------------------------------------------- */
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* --- Top bar -------------------------------------------------------------- */
+.topbar { display: flex; justify-content: space-between; align-items: center; }
+.brand { font-weight: 600; font-size: 0.9rem; letter-spacing: 0.02em; }
+.icon-btn {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  font-size: 1rem;
+  cursor: pointer;
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+.icon-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.settings { margin-top: 12px; padding: 16px 18px; font-size: 0.85rem; }
+.toggle { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+.toggle small { display: block; color: var(--muted); }
+.config-lines { margin-top: 10px; font-family: ui-monospace, monospace; font-size: 0.72rem; color: var(--muted); }
+.config-lines p { margin: 2px 0; }
+.link-btn { border: none; background: none; color: var(--accent); cursor: pointer; padding: 8px 0 0; font-size: 0.82rem; }
+.prompt-log { max-height: 280px; overflow-y: auto; font-size: 0.72rem; margin-top: 6px; }
+.prompt-entry pre {
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  padding: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 4px 0 10px;
+}
+
+/* --- Hero: orb + greeting + chips + prompt bar ----------------------------- */
+.hero { text-align: center; padding-top: 34px; }
+.assistant-label {
+  margin: 22px 0 4px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.greeting { font-size: 1.5rem; font-weight: 650; margin: 0 auto 22px; max-width: 420px; }
+
+/* --- The orb --------------------------------------------------------------- */
+.orb-wrap { position: relative; width: 190px; height: 190px; margin: 0 auto; }
+.orb-glow {
+  position: absolute; inset: -30px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 130, 205, 0.55) 0%, rgba(130, 150, 255, 0.32) 45%, transparent 70%);
+  filter: blur(12px);
+}
+.orb {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(140deg, #d8ffe9 0%, #efe0ff 100%);
+  box-shadow:
+    inset 0 0 22px rgba(255, 255, 255, 0.55),
+    0 18px 45px rgba(120, 110, 220, 0.3);
+  animation: breathe 4.5s ease-in-out infinite;
+}
+.orb-blob { position: absolute; border-radius: 50%; filter: blur(12px); }
+.orb-blob-a {
+  width: 120%; height: 120%; left: -8%; top: 4%;
+  z-index: 2; /* pink is the focal core, painted over blue/green like the mock */
+  background: radial-gradient(circle at 48% 48%, #ff6ec0 0%, rgba(255, 110, 192, 0.55) 35%, rgba(255, 110, 192, 0) 68%);
+  animation: drift-a 7s ease-in-out infinite alternate;
+}
+.orb-blob-b {
+  width: 115%; height: 115%; right: -30%; top: -22%;
+  background: radial-gradient(circle at 60% 50%, #7e97ff 0%, rgba(126, 151, 255, 0) 62%);
+  animation: drift-b 9s ease-in-out infinite alternate;
+}
+.orb-blob-c {
+  width: 110%; height: 110%; left: 2%; bottom: -35%;
+  background: radial-gradient(circle at 50% 40%, #63e6ae 0%, rgba(99, 230, 174, 0) 62%);
+  animation: drift-c 8s ease-in-out infinite alternate;
+}
+.orb-ring {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.65);
+  opacity: 0;
+}
+
+@keyframes breathe { 50% { transform: scale(1.035); } }
+@keyframes drift-a { to { transform: translate(24%, -14%) scale(1.12); } }
+@keyframes drift-b { to { transform: translate(-20%, 22%) scale(1.08); } }
+@keyframes drift-c { to { transform: translate(-12%, -20%) scale(1.15); } }
+
+/* orb states */
+.orb-listening .orb { animation: breathe 1.1s ease-in-out infinite; }
+.orb-listening .orb-blob-a { animation-duration: 2.2s; }
+.orb-listening .orb-glow {
+  background: radial-gradient(circle, rgba(255, 120, 190, 0.6) 0%, rgba(255, 140, 200, 0.3) 45%, transparent 70%);
+}
+.orb-thinking .orb-blob-a, .orb-thinking .orb-blob-b, .orb-thinking .orb-blob-c {
+  animation-duration: 1.6s;
+}
+.orb-thinking .orb { animation: breathe 1.6s ease-in-out infinite; }
+.orb-speaking .orb-ring { animation: ripple 1.6s ease-out infinite; }
+.orb-speaking .orb-ring-2 { animation-delay: 0.8s; }
+
+@keyframes ripple {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(1.45); opacity: 0; }
+}
+
+/* --- Example chips ---------------------------------------------------------- */
+.chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 22px; }
+.chip {
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.chip:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(80, 90, 180, 0.2); }
+.chip:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* --- Prompt bar --------------------------------------------------------------- */
+.prompt-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  max-width: 560px;
+  margin: 0 auto;
+}
+.prompt-input {
+  flex: 1;
+  border: none;
+  background: none;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--text);
+  outline: none;
+  min-width: 0;
+}
+.prompt-input::placeholder { color: var(--muted); }
+.prompt-input:disabled { color: var(--muted); }
+
+.mic-btn {
+  width: 42px; height: 42px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: none;
+  background: #1c2128;
+  color: #fff;
+  font-size: 1.05rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+.mic-btn:hover:not(:disabled) { transform: scale(1.06); }
+.mic-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.mic-recording { background: var(--danger); animation: pulse-btn 1.1s ease infinite; }
+@keyframes pulse-btn { 50% { box-shadow: 0 0 0 10px rgba(229, 72, 77, 0.18); } }
+
+.send-btn {
+  width: 42px; height: 42px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.send-btn:hover:not(:disabled) { transform: scale(1.06); }
+.send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.hint { font-size: 0.75rem; color: var(--muted); margin-top: 12px; }
+
+/* --- Results ------------------------------------------------------------------ */
+.results { margin-top: 26px; display: flex; flex-direction: column; gap: 16px; }
+.card { padding: 18px 20px; }
+.card h2 { font-size: 0.82rem; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+
+/* step log */
+.step-log { list-style: none; margin: 0; padding: 0; }
+.step {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+  font-size: 0.85rem;
+  animation: fade-in 0.3s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+}
+.step:last-child { border-bottom: none; }
+.step-icon { flex-shrink: 0; }
+.step-node { font-weight: 600; margin-right: 8px; }
+.step-summary { color: var(--muted); word-break: break-word; }
+.step-pending .step-summary { font-style: italic; }
+@keyframes fade-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+.spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(120, 130, 200, 0.3);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* answer bubble */
+.answer-card { border-left: none; }
+.answer-row { display: flex; align-items: flex-start; gap: 14px; }
+.answer-text { font-size: 1.08rem; margin: 0; flex: 1; }
+.play-btn { background: var(--accent); }
+audio { width: 100%; margin-top: 12px; height: 38px; }
+
+/* table */
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(140, 150, 200, 0.18); }
+th { color: var(--muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; }
+tr:last-child td { border-bottom: none; }
+
+/* citations */
+.citations { list-style: none; margin: 0; padding: 0; font-size: 0.85rem; }
+.citations li { padding: 5px 0; word-break: break-word; }
+.citations a { color: var(--accent); }
+.citations code {
+  background: rgba(255, 255, 255, 0.55);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+}
+
+/* banners */
+.banner { padding: 12px 16px; font-size: 0.85rem; margin-top: 16px; }
+.banner-error { background: var(--error-bg); color: var(--error-text); }
+.banner-warn { background: var(--warn-bg); color: var(--warn-text); }
+
+.muted { color: var(--muted); font-size: 0.85rem; }
+.warn-text { color: var(--warn-text); font-size: 0.8rem; }
+
+@media (max-width: 560px) {
+  .greeting { font-size: 1.25rem; }
+  .orb-wrap { width: 150px; height: 150px; }
+}
