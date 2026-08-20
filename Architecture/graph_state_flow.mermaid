@@ -1,9 +1,10 @@
 graph TD
     A["🎤 transcript<br/>(input, from ASR)"] --> B
 
-    B["Router<br/>reads: transcript<br/>writes: query, constraints, safety_flag<br/><i>classifies intent (search / comparison /<br/>follow-up / out-of-scope), extracts<br/>budget / brand / category, flags unsafe asks</i>"]
+    B["Router<br/>reads: transcript<br/>writes: intent, query, constraints, safety_flag<br/><i>classifies intent (search / comparison /<br/>follow-up / out-of-scope), extracts<br/>budget / brand / category, flags unsafe asks</i>"]
     B -->|safety_flag set| C["Safe-refusal path<br/>(skip retrieval entirely)"]
-    B -->|safety_flag = None| D
+    B -->|intent = out_of_scope| C2["Out-of-scope path<br/>(polite redirect, skip retrieval)"]
+    B -->|else| D
 
     D["Planner<br/>reads: query, constraints<br/>writes: plan<br/><i>DECIDES sourcing: plan.use_rag is always true;<br/>plan.use_web is true only if the query implies<br/>live price / availability. No tool calls here.</i>"]
     D --> E
@@ -25,6 +26,7 @@ graph TD
     style E fill:#2196F3,color:#fff
     style F fill:#2196F3,color:#fff
     style C fill:#f8d7da,color:#000
+    style C2 fill:#f8d7da,color:#000
     style E1 fill:#9C27B0,color:#fff
     style E2 fill:#9C27B0,color:#fff
     style E3 fill:#2196F3,color:#fff

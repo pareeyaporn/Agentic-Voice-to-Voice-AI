@@ -20,6 +20,12 @@ LLM_MODEL = os.environ.get("LLM_MODEL", "")
 
 PROMPTS_DIR = os.path.join(REPO_ROOT, "Code", "6. Prompts & Documentation")
 
-_has_key = bool(os.environ.get("OPENAI_API_KEY"))  # presence only -- never read/printed
-assert _has_key, "OPENAI_API_KEY missing -- copy .env.example to .env and fill it in"
-assert LLM_MODEL, "LLM_MODEL missing in .env"
+def require_llm_config() -> None:
+    """Validates the LLM env vars at first real use, not at import -- app.py
+    imports this module unconditionally, and mock-data mode (§5.1) must work
+    with no .env at all. Nodes call this lazily before building their LLM."""
+    _has_key = bool(os.environ.get("OPENAI_API_KEY"))  # presence only -- never read/printed
+    if LLM_PROVIDER == "openai" and not _has_key:
+        raise RuntimeError("OPENAI_API_KEY missing -- copy .env.example to .env and fill it in")
+    if not LLM_MODEL:
+        raise RuntimeError("LLM_MODEL missing in .env")

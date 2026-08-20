@@ -29,9 +29,14 @@ TTS_MODEL = os.environ.get("TTS_MODEL", "tts-1")
 TTS_VOICE = os.environ.get("TTS_VOICE", "alloy")
 TTS_MAX_SECONDS = 15.0  # matches the Answerer's (§2.5) spoken-summary length budget
 
-if TTS_PROVIDER == "openai":
-    _has_key = bool(os.environ.get("OPENAI_API_KEY"))  # presence only -- never read/printed
-    assert _has_key, (
-        "OPENAI_API_KEY missing -- copy .env.example to .env and fill it in "
-        "(needed for TTS_PROVIDER=openai)"
-    )
+def require_tts_config() -> None:
+    """Validates TTS env vars at first synthesis, not at import -- app.py
+    imports this module unconditionally, and mock-data mode (§5.1, which
+    never synthesizes) must work with no .env at all."""
+    if TTS_PROVIDER == "openai":
+        _has_key = bool(os.environ.get("OPENAI_API_KEY"))  # presence only -- never read/printed
+        if not _has_key:
+            raise RuntimeError(
+                "OPENAI_API_KEY missing -- copy .env.example to .env and fill it in "
+                "(needed for TTS_PROVIDER=openai)"
+            )

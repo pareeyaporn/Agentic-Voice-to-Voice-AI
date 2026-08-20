@@ -1,8 +1,11 @@
 """
-Graph state schema (§2.1). Matches the 8-field list agreed on in design --
+Graph state schema (§2.1). The original 8-field list agreed on in design --
 transcript, query, constraints, safety_flag, plan, tool_results, citations,
-final_answer -- no multi-turn/history tracking yet (deferred, see the design
-notebook). tool_results is one nested dict rather than three top-level fields.
+final_answer -- plus `intent`, added later so out-of-scope queries can
+short-circuit at the Router instead of flowing through the full pipeline
+(closing §2.2's known gap). No multi-turn/history tracking yet (deferred,
+see the design notebook). tool_results is one nested dict rather than three
+top-level fields.
 """
 
 from typing import Any, Dict, List, Optional, TypedDict
@@ -28,6 +31,7 @@ class GraphState(TypedDict):
     Architecture/graph_state_flow.mermaid for which node reads/writes what."""
 
     transcript: str  # raw ASR output (input)
+    intent: str  # Router: product_search | comparison | follow_up | out_of_scope
     query: str  # Router: normalized search query
     constraints: Dict[str, Any]  # Router: budget/brand/category/etc.
     safety_flag: Optional[str]  # Router: reason string, or None
@@ -39,6 +43,7 @@ class GraphState(TypedDict):
 
 EMPTY_STATE: GraphState = {
     "transcript": "",
+    "intent": "",
     "query": "",
     "constraints": {},
     "safety_flag": None,

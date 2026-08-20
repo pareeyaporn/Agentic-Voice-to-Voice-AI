@@ -17,9 +17,6 @@ right source without trusting the LLM to self-classify.
 import os
 from difflib import SequenceMatcher
 
-import chromadb
-from sentence_transformers import SentenceTransformer
-
 import mcp_client
 from config import REPO_ROOT
 from mcp_client import ToolCallError
@@ -37,9 +34,24 @@ CHROMA_PERSIST_DIR_HK = os.path.join(
 )
 CHROMA_COLLECTION_HK = os.environ.get("CHROMA_COLLECTION", "products_home_kitchen")
 
-_model = SentenceTransformer(EMBEDDING_MODEL)
-_client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR_HK)
-_collection = _client.get_collection(CHROMA_COLLECTION_HK)
+# Loaded lazily (imports included -- sentence_transformers pulls in torch,
+# seconds of import time by itself): only the MCP server subprocess ever
+# calls search(), so the graph process, which imports this module for
+# retriever_node/reconcile(), must not pay for the embedding model + Chroma
+# a second time. Before this, both processes loaded them (§4.3 finding).
+_model = None
+_collection = None
+
+
+def _ensure_index():
+    global _model, _collection
+    if _model is None:
+        import chromadb
+        from sentence_transformers import SentenceTransformer
+
+        _model = SentenceTransformer(EMBEDDING_MODEL)
+        _client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR_HK)
+        _collection = _client.get_collection(CHROMA_COLLECTION_HK)
 
 MCP_ACCEPTED_RAG_FILTER_KEYS = ("budget_min", "budget_max", "category", "brand")
 # material/quantity excluded -- the rag.search tool's schema doesn't declare
@@ -77,6 +89,7 @@ def search(query, top_k=5, budget_min=None, budget_max=None, category=None, bran
     """Hybrid retrieval: vector similarity + metadata filters, with
     unit-aware tie-breaking. Returns a list of dicts, each carrying `doc_id`
     for citation. Single-collection version -- always products_home_kitchen."""
+    _ensure_index()
     where_clauses = []
     if budget_min is not None:
         where_clauses.append({"price": {"$gte": budget_min}})

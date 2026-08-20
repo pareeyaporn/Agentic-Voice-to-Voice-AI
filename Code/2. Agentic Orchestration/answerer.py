@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from config import LLM_MODEL, LLM_PROVIDER, PROMPTS_DIR
+from config import LLM_MODEL, LLM_PROVIDER, PROMPTS_DIR, require_llm_config
 from providers import get_chat_model, invoke_and_log
 from state import GraphState
 
@@ -37,6 +37,11 @@ RAW_ID_LEAK_FALLBACK = "I found a good match but had trouble summarizing it clea
 # A `ref` is either a doc_id (32-char hex, §1.3) or a url. 16+ hex chars is a
 # generous floor -- real spoken content essentially never matches by accident.
 _RAW_ID_RE = re.compile(r"\b[0-9a-f]{16,}\b|https?://\S+|www\.\S+", re.IGNORECASE)
+
+# Sentence boundary = terminal punctuation + whitespace. The lookbehind keeps
+# the punctuation attached to its sentence. Prices ("$12.99") don't false-match:
+# their periods aren't followed by whitespace.
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
 
 class AnswererCitation(BaseModel):
@@ -51,9 +56,19 @@ class AnswererOutput(BaseModel):
 with open(os.path.join(PROMPTS_DIR, "answerer_critic_system_prompt.md")) as f:
     ANSWERER_SYSTEM_PROMPT = f.read()
 
-answerer_llm = get_chat_model(LLM_PROVIDER, LLM_MODEL, temperature=0).with_structured_output(
-    AnswererOutput, method="function_calling"
-)
+# Built lazily, not at import -- see router.py's note (mock-data mode must
+# import the graph with no .env/API key at all).
+_answerer_llm = None
+
+
+def _get_answerer_llm():
+    global _answerer_llm
+    if _answerer_llm is None:
+        require_llm_config()
+        _answerer_llm = get_chat_model(LLM_PROVIDER, LLM_MODEL, temperature=0).with_structured_output(
+            AnswererOutput, method="function_calling"
+        )
+    return _answerer_llm
 
 
 def _ref(p: Dict[str, Any]) -> Optional[str]:
@@ -119,9 +134,24 @@ def scrub_raw_ids(result: AnswererOutput) -> AnswererOutput:
 
 
 def enforce_length(result: AnswererOutput) -> AnswererOutput:
+    """Cuts at sentence boundaries, not a raw words[:40] slice -- this text
+    is spoken by TTS (§4.2), and a mid-sentence "...$12.99 and..." cutoff is
+    audibly broken in a way it never is on screen. Keeps whole sentences
+    while they fit the budget; the raw word cut survives only as a last
+    resort for a single run-on sentence that alone exceeds the budget."""
     words = result.answer.split()
     if len(words) <= ANSWER_WORD_BUDGET:
         return result
+    kept: List[str] = []
+    count = 0
+    for sentence in _SENTENCE_SPLIT_RE.split(result.answer.strip()):
+        n = len(sentence.split())
+        if count + n > ANSWER_WORD_BUDGET:
+            break
+        kept.append(sentence)
+        count += n
+    if kept:
+        return AnswererOutput(answer=" ".join(kept), citations=result.citations)
     return AnswererOutput(answer=" ".join(words[:ANSWER_WORD_BUDGET]) + "...", citations=result.citations)
 
 
@@ -135,7 +165,7 @@ def answerer_node(state: GraphState) -> GraphState:
 
     candidate_text = format_candidates(products)
     human_message = f"Query: {state['query']}\nConstraints: {state['constraints']}\n\nCandidates:\n{candidate_text}"
-    result: AnswererOutput = invoke_and_log(answerer_llm, "answerer", ANSWERER_SYSTEM_PROMPT, human_message)
+    result: AnswererOutput = invoke_and_log(_get_answerer_llm(), "answerer", ANSWERER_SYSTEM_PROMPT, human_message)
 
     result = grounding_check(result, products)
     result = scrub_raw_ids(result)

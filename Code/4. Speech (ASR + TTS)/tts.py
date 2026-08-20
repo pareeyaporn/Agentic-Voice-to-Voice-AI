@@ -16,7 +16,7 @@ import io
 import wave
 from dataclasses import dataclass
 
-from speech_config import TTS_MAX_SECONDS, TTS_MODEL, TTS_PROVIDER, TTS_VOICE
+from speech_config import TTS_MAX_SECONDS, TTS_MODEL, TTS_PROVIDER, TTS_VOICE, require_tts_config
 
 _client = None  # lazy singleton, same reasoning as asr.py's _model
 
@@ -88,6 +88,10 @@ def synthesize(text: str, max_seconds: float = TTS_MAX_SECONDS) -> SynthesisResu
         )
     if not text or not text.strip():
         raise TTSError("Cannot synthesize empty text")
+    try:
+        require_tts_config()
+    except RuntimeError as e:
+        raise TTSError(str(e)) from e
 
     try:
         audio_bytes = _synthesize_once(text, speed=1.0)
