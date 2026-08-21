@@ -27,11 +27,17 @@ One LangGraph pipeline; every retrieval path (private catalog or live web) goes 
 ```mermaid
 graph TD
     A["🎤 User Voice Input"] -->|Audio File| B["ASR<br/>faster-whisper<br/>asr.py"]
-    B -->|Transcript| C["Streamlit UI<br/>app.py"]
-    C -->|Display Query| D["LangGraph<br/>graph.py"]
+
+    B -->|Transcript| C1["Streamlit UI<br/>app.py"]
+    B -->|Transcript| FE["React UI<br/>App.jsx"]
+    FE <-->|HTTP + streamed NDJSON| BE["FastAPI Backend<br/>main.py<br/>/api/transcribe, /api/query, /api/tts"]
+
+    C1 -->|Display Query| D["LangGraph<br/>graph.py"]
+    BE -->|Display Query| D
     D --> E["Router<br/>Intent + Constraints"]
     E -->|safety_flag set| S["Safe-refusal path"]
-    E -->|safe| F["Planner<br/>rag vs. web sourcing"]
+    E -->|safe, intent = out_of_scope| OOS["Out-of-scope path<br/>polite redirect"]
+    E -->|safe, in-scope intent| F["Planner<br/>rag vs. web sourcing"]
     F --> R["Retriever<br/>Call MCP Tools per plan"]
     R -->|rag.search always| G["MCP SERVER<br/>mcp_server.py"]
     R -.->|web.search if plan.use_web| G
@@ -43,14 +49,26 @@ graph TD
     K -.-> G
     G --> R
     R -->|Reconciled products| L["Answerer/Critic<br/>Synthesize + ground + cite"]
-    S --> M["Streamlit UI<br/>Display Results"]
-    L -->|Answer + Citations| M
-    M --> N["Comparison Table"]
-    M --> O["Agent Step Log"]
-    M -->|Answer Text| P["TTS<br/>tts.py"]
+    S --> M1["Streamlit UI<br/>Display Results"]
+    OOS --> M1
+    L -->|Answer + Citations| M1
+    S --> BE
+    OOS --> BE
+    L -->|Answer + Citations| BE
+    M1 --> N["Comparison Table"]
+    M1 --> O["Agent Step Log"]
+    BE -->|streamed step log +<br/>comparison + citations| FE
+    M1 -->|Answer Text| P["TTS<br/>tts.py"]
+    BE -->|Answer Text| P
     P -->|Audio| Q["🔊 Playback"]
+    FE -->|Audio| Q
     Q --> A
+
+    style FE fill:#61DAFB,color:#000
+    style BE fill:#009688,color:#fff
 ```
+
+Two UI options, same pipeline underneath (`graph.py` doesn't know or care which one called it) -- Streamlit stays the reference UI, React+FastAPI is an alternative. Streamlit is one process calling `asr.py`/`graph.py`/`tts.py` in-process; React+FastAPI is two processes talking over HTTP, with `main.py` as a thin API layer over the exact same modules. See [webapp/README.md](webapp/README.md) for the React+FastAPI path.
 
 See also [architecture_comparison.mermaid](Architecture/architecture_comparison.mermaid) (naive vs. MCP-routed design).
 
@@ -63,7 +81,7 @@ See also [architecture_comparison.mermaid](Architecture/architecture_comparison.
 | **Agentic RAG** | Hybrid vector + metadata search, Chroma (`products_home_kitchen` demo slice + `products_all` full catalog) |
 | **MCP Server** | One server, two tools — `rag.search`, `web.search` (Tavily) — with caching + logging |
 | **TTS** | OpenAI TTS, ≤15s answers, provider-swappable |
-| **UI** | Streamlit — mic input, step log, comparison table, citations, Play-TTS |
+| **UI** | Streamlit (reference) — mic input, step log, comparison table, citations, Play-TTS. React + FastAPI (alternative) — voice-first orb, hands-free loop |
 | **LLM** | Model-agnostic via env config (OpenAI, Anthropic, Gemini, Bedrock, open-weight) |
 
 ## Data
