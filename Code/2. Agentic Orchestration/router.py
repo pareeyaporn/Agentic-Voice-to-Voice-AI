@@ -7,9 +7,11 @@ function/tool calling to stay in use.
 
 System prompt: Code/6. Prompts & Documentation/router_system_prompt.md
 
-Known gap: `intent` is computed but not persisted to GraphState (kept to
-the 8-field schema, §2.1) -- an out_of_scope query still flows through
-Planner/Retriever/Answerer instead of short-circuiting.
+`intent` is persisted to GraphState and an out_of_scope query short-circuits
+to `out_of_scope_node` (a polite redirect, no retrieval/LLM cost) -- this
+closes what was previously documented here as a known gap. `follow_up` is
+treated as in-scope: with no multi-turn history yet (§2.1), running it as a
+standalone query beats refusing it.
 """
 
 import os
@@ -17,7 +19,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from config import LLM_MODEL, LLM_PROVIDER, PROMPTS_DIR
+from config import LLM_MODEL, LLM_PROVIDER, PROMPTS_DIR, require_llm_config
 from providers import get_chat_model, invoke_and_log
 from state import GraphState
 
@@ -41,17 +43,28 @@ class RouterOutput(BaseModel):
 with open(os.path.join(PROMPTS_DIR, "router_system_prompt.md")) as f:
     ROUTER_SYSTEM_PROMPT = f.read()
 
-router_llm = get_chat_model(LLM_PROVIDER, LLM_MODEL, temperature=0).with_structured_output(
-    RouterOutput, method="function_calling"
-)
+# Built lazily, not at import -- app.py imports the graph even in mock-data
+# mode (§5.1), which must work with no .env/API key at all.
+_router_llm = None
+
+
+def _get_router_llm():
+    global _router_llm
+    if _router_llm is None:
+        require_llm_config()
+        _router_llm = get_chat_model(LLM_PROVIDER, LLM_MODEL, temperature=0).with_structured_output(
+            RouterOutput, method="function_calling"
+        )
+    return _router_llm
 
 
 def classify_transcript(transcript: str) -> RouterOutput:
-    return invoke_and_log(router_llm, "router", ROUTER_SYSTEM_PROMPT, transcript)
+    return invoke_and_log(_get_router_llm(), "router", ROUTER_SYSTEM_PROMPT, transcript)
 
 
 def router_node(state: GraphState) -> GraphState:
     result = classify_transcript(state["transcript"])
+    state["intent"] = result.intent
     state["query"] = result.query
     state["constraints"] = result.constraints.model_dump(exclude_none=True)
     state["safety_flag"] = result.safety_flag
@@ -61,4 +74,15 @@ def router_node(state: GraphState) -> GraphState:
 def safe_refusal_node(state: GraphState) -> GraphState:
     """Reached only when Router's safety_flag is set. Skips Planner/Retriever/Answerer."""
     state["final_answer"] = f"I can't help with that: {state['safety_flag']}"
+    return state
+
+
+def out_of_scope_node(state: GraphState) -> GraphState:
+    """Reached only when Router's intent is out_of_scope (and no safety_flag --
+    that route wins). A polite redirect, not a refusal: the query isn't unsafe,
+    it's just not a shopping request, so no retrieval/LLM spend happens."""
+    state["final_answer"] = (
+        "I'm a shopping assistant, so that's outside what I can help with -- "
+        "but I'd be happy to find or compare products for you."
+    )
     return state

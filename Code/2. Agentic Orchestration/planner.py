@@ -22,7 +22,7 @@ import os
 
 from pydantic import BaseModel, Field
 
-from config import LLM_MODEL, LLM_PROVIDER, PROMPTS_DIR
+from config import LLM_MODEL, LLM_PROVIDER, PROMPTS_DIR, require_llm_config
 from providers import get_chat_model, invoke_and_log
 from state import GraphState
 
@@ -37,12 +37,22 @@ class WebSearch(BaseModel):
 with open(os.path.join(PROMPTS_DIR, "planner_system_prompt.md")) as f:
     PLANNER_SYSTEM_PROMPT = f.read()
 
-planner_llm = get_chat_model(LLM_PROVIDER, LLM_MODEL, temperature=0).bind_tools([WebSearch])
+# Built lazily, not at import -- see router.py's note (mock-data mode must
+# import the graph with no .env/API key at all).
+_planner_llm = None
+
+
+def _get_planner_llm():
+    global _planner_llm
+    if _planner_llm is None:
+        require_llm_config()
+        _planner_llm = get_chat_model(LLM_PROVIDER, LLM_MODEL, temperature=0).bind_tools([WebSearch])
+    return _planner_llm
 
 
 def decide_use_web(query: str) -> bool:
     """True iff the model actually chose to call WebSearch for this query."""
-    result = invoke_and_log(planner_llm, "planner", PLANNER_SYSTEM_PROMPT, query)
+    result = invoke_and_log(_get_planner_llm(), "planner", PLANNER_SYSTEM_PROMPT, query)
     return len(result.tool_calls) > 0
 
 
