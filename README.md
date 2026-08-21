@@ -18,6 +18,8 @@ Opens at `http://localhost:8501`. Mock-data mode is on by default ($0 cost) — 
 
 The vector index is already committed, so no rebuild is needed. To rebuild, run notebooks `1.1` → `1.2` → `1.3`.
 
+**Alternative UI:** a React + FastAPI webapp (`webapp/`) is also available -- same pipeline, voice-first layout. See [webapp/README.md](webapp/README.md) to run it. Streamlit stays the reference UI; either one satisfies the project's UI deliverable.
+
 ## Architecture
 
 One LangGraph pipeline; every retrieval path (private catalog or live web) goes through a single MCP server exposing two tools:
@@ -84,6 +86,7 @@ Project/
 │   └── 6. Prompts & Documentation/      # system prompts
 ├── Data/                 # Raw Kaggle download (see Data/README.md)
 ├── Project Overview/     # Team structure, task backlog, data schema, RAG eval plan
+├── webapp/               # Alternative UI: React + FastAPI (see webapp/README.md)
 ├── requirements.txt
 ├── .env.example
 └── README.md
@@ -112,7 +115,7 @@ Each numbered `Code/` folder has its own README or module docstrings for detail.
 
 ## Status
 
-🚧 §1-4 (Data, Orchestration, MCP, Speech) implemented and tested. §5 (UI) core flow works end-to-end; polish not started.
+🚧 §1-5 (Data, Orchestration, MCP, Speech, UI) implemented and tested, including performance/reliability (see [performance_reliability_report.md](Project%20Overview/performance_reliability_report.md)). Remaining: usability testing with real external users (needs people outside the team).
 
 ## License
 

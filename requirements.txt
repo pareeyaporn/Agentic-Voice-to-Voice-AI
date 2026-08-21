@@ -35,3 +35,9 @@ openai==2.53.0
 # --- §5 User Interface ---
 streamlit==1.45.1
 streamlit-mic-recorder==0.0.8
+
+# --- §5.4 Alternative UI: React + FastAPI webapp (webapp/backend) ---
+# Frontend (webapp/frontend) deps are separate -- npm, not pip; see webapp/README.md.
+fastapi==0.141.1
+uvicorn==0.52.3
+python-multipart==0.0.32      # required by FastAPI's UploadFile (webapp/backend/main.py's /api/transcribe)

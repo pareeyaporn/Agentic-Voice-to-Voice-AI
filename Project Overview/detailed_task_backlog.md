@@ -65,7 +65,8 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 - [x] Design/prototyping in [2.1-2.6 graph and nodes.ipynb](../Code/2.%20Agentic%20Orchestration/2.1-2.6%20graph%20and%20nodes.ipynb) (frozen record); later extracted into `.py` modules (`config.py`, `state.py`, `providers.py`, `router.py`, `planner.py`, `retriever.py`, `answerer.py`, `graph.py`) once §2.7 needed a real importable graph
 
 ### 2.2 Router Node — `CP1` → `CP2`
-- [x] Intent classification (search/comparison/follow-up/out-of-scope) via one structured-output LLM call. Known gap: `intent` isn't acted on — an out-of-scope query still flows through the graph instead of short-circuiting
+- [x] Intent classification (search/comparison/follow-up/out-of-scope) via one structured-output LLM call
+- [x] **Fixed:** `intent` used to be extracted but not acted on (an out-of-scope query still flowed through the whole graph). Now persisted on `GraphState` and short-circuited to a polite-redirect node before Planner/Retriever run — `safety_flag` still takes priority when both fire
 - [x] Constraint extraction (budget/material/brand/category/quantity) in the same call
 - [x] Safety-flag detection → routes to `safe_refusal`, verified end-to-end
 - [x] Prompt: [router_system_prompt.md](../Code/6.%20Prompts%20%26%20Documentation/router_system_prompt.md) — now includes a 4-row few-shot examples table (added after the charter re-read found the Prompt Disclosure line explicitly expects few-shot examples, and none of the 3 prompts originally had any). Verified with real calls after adding: still parses correctly, and the safety-flag example's exact wording showed up in a real follow-up call's output
@@ -85,12 +86,14 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 - [x] Fixed: `category_top` is constant within `products_home_kitchen`, so filtering by it there is meaningless — dropped client-side, now forwarded again since the server (§3.2) warns instead of silently dropping
 - [x] Fixed an anyio bug: closing the MCP session from a different asyncio Task than opened it raises `RuntimeError` (anyio ties cancel scopes to the opening task; LangGraph runs async nodes in its own task) — `mcp_client.close()` now catches and logs this rather than crashing; affects shutdown cleanliness only, not correctness
 - [x] Known gap (resolved in §2.5): web results had no `doc_id`, so citations were rag-only by construction
+- [x] **Fixed (§4.3 finding):** the graph process was importing torch/Chroma at module load for nothing — the embedding model and Chroma only actually get used inside the MCP subprocess. Retriever now loads both lazily inside `search()`, so the graph process no longer pays for a model it never uses
 
 ### 2.5 Answerer/Critic Node — `CP2` → `FINAL`
 - [x] One structured-output LLM call synthesizes recommendation + citations
 - [x] Grounding check: deterministic — every cited ref must match a real retrieved product, else the whole answer is discarded for a fixed fallback
 - [x] No separate safety re-check — Router already filters unsafe queries before Answerer runs
-- [x] ~40-word length budget enforced by truncation (can cut mid-sentence — known rough edge)
+- [x] ~40-word length budget enforced by truncation
+- [x] **Fixed:** truncation used to be a raw word cut, which could stop TTS mid-sentence. `enforce_length()` now cuts at the last sentence boundary within budget; the raw word cut is kept only as a fallback for a single run-on sentence longer than the whole budget
 - [x] Prompt: [answerer_critic_system_prompt.md](../Code/6.%20Prompts%20%26%20Documentation/answerer_critic_system_prompt.md) — now includes 2 worked examples (rag-only, mixed rag+web) showing candidates in, `{answer, citations}` out, reinforcing the "never speak a ref in `answer`" rule concretely rather than only stating it
 - [x] **Fixed:** the model occasionally spoke a raw `doc_id` aloud (~40% of runs on one low-context query) — prompt tension between "cite by doc_id" and "don't recite IDs." Fixed with a clearer prompt (dropped the leak to 0/6) plus a deterministic regex backstop, `scrub_raw_ids()`
 - [x] **Citation schema fix:** `doc_id` was required, so web results (url-only) could never be cited. Replaced with a generic `ref` field (doc_id or url), resolved to `{source, doc_id, url, title}` by lookup against real products — the LLM never self-classifies rag vs. web
@@ -102,6 +105,7 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 - [x] openai branch defaults `use_responses_api=True` — found necessary by testing: the pinned reasoning model rejects tool-calling on the older `/v1/chat/completions` surface, needed for Router/Answerer/Planner's real tool-calling calls (§2.2/§2.3/§2.5)
 - [x] Dropped the "test 2+ providers" bullet — the brief only requires code swappability, not live multi-provider testing
 - [x] `invoke_and_log()` is the single LLM entrypoint for every node, capturing system prompt + I/O (Prompt Disclosure requirement)
+- [x] **Fixed:** env validation used to be an import-time assert, so even mock-data mode (no real calls) required a full `.env`. Moved to `require_llm_config()`/`require_tts_config()`, checked lazily at first real use — Router/Planner/Answerer now build their LLM clients lazily too, so mock mode genuinely needs no `.env` at all
 
 ### 2.7 Testing — `CP2` → `FINAL`
 - [x] Free (0 LLM-cost) deterministic tests re-verified after `.py` extraction (Planner rule, grounding/length checks)
@@ -161,9 +165,10 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 **Testing:** [4.1-4.2 speech smoke test.ipynb](../Code/4.%20Speech%20%28ASR%20%2B%20TTS%29/4.1-4.2%20speech%20smoke%20test.ipynb) — real TTS→ASR round trip, budget-correction path, multilingual case, error paths. Cost: 5 real TTS calls, ~$0.015 total.
 
 ### 4.3 Performance & Reliability — `FINAL`
-- [ ] Measure end-to-end latency (needs §5's UI)
-- [ ] Timeouts/fallbacks for slow calls
-- [ ] Stress test back-to-back queries
+- [x] Measured end-to-end latency for real, per graph node — [4.3 performance and reliability.ipynb](../Code/4.%20Speech%20%28ASR%20%2B%20TTS%29/4.3%20performance%20and%20reliability.ipynb): 2 representative queries, full ASR→graph→TTS pipeline, totals **17.16s** and **12.56s** (retriever is the largest single slice, 3.3-6.6s)
+- [x] Timeouts added on every real network call, previously all on the SDKs' own generous defaults (OpenAI's is 600s): `providers.py` (LLM calls, 30s), `tts.py` (OpenAI TTS, 30s), `web_search_tool.py` (Tavily, 15s, found necessary because `tavily-python`'s own default is 60s x 3 retries = 180s worst case), plus a 120s defense-in-depth outer bound in `async_runtime.run_async()` for the UI. `app.py` catches `TimeoutError` specifically with a clear user-facing message rather than a generic error
+- [x] Stress test: 6 back-to-back real `graph.ainvoke()` calls (incl. one exact repeat) in 38.93s — confirms the persistent MCP session survives back-to-back load (1 session object reused across all 6 calls) and Tavily's 120s cache actually engages on the repeat (8.46s → 5.35s). 5/6 queries logged a `rag.search` error; verified for real (not assumed) — all 5 are the known, documented "category filter not applied" warning (§2.4: `category_top` is constant within `products_home_kitchen`), not genuine failures
+- [ ] Write-up not yet created: notebook's intro references `Project Overview/performance_reliability_report.md`, which doesn't exist yet
 
 ---
 
@@ -184,14 +189,26 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 - [x] "Play answer" button — real TTS playback, cached per answer text so replay doesn't re-pay; disabled in mock mode
 
 ### 5.3 Polish — `FINAL`
-- [ ] Loading states, error messaging, responsive layout, usability testing
+- [x] Loading states — `st.spinner` around ASR transcription, the graph run, and TTS synthesis
+- [x] Error messaging — typed `ASRError`/`TTSError` surfaced with specific messages, a `TimeoutError`-specific message (§4.3), tool-error warnings shown alongside partial results, generic exceptions surfaced rather than swallowed
+- [x] Responsive layout — `layout="wide"` + `use_container_width=True` on the results table
+- [ ] Usability testing (brief calls for a lightweight test with 2-3 outside users) — cannot be performed by the assistant; needs real external testers
+
+### 5.4 Alternative UI — React + FastAPI webapp (not in the original plan)
+- [x] `webapp/backend/main.py` — FastAPI thin HTTP layer over the same `graph.py`/`asr.py`/`tts.py` modules; streams the agent step log as NDJSON per node; endpoints for transcribe/query/tts/config/prompt-log
+- [x] `webapp/frontend/` — React (Vite): audio-reactive orb as the primary control (tap to speak), hands-free full voice-to-voice loop, streamed step log, comparison table, citations, dark mode
+- [x] Shared mock-data/step-summary logic factored out into `Code/5. User Interface/ui_common.py`, used by both UIs — Streamlit stays the reference UI, this is an alternative, not a replacement
+- [ ] **Not done: `requirements.txt` was never updated for this.** `webapp/backend/main.py` imports `fastapi`, which isn't installed in this project's environment at all (`uvicorn`/`python-multipart` happen to already be present as transitive deps, but aren't declared either) — following `requirements.txt` alone, the backend can't start
+- [ ] **Not done: `webapp/README.md`'s run instructions reference `.venv/bin/uvicorn`**, but no `.venv` exists anywhere in this repo (the rest of the project just uses `pip install -r requirements.txt` directly) — inconsistent with how everything else here is set up
+- [ ] **Not done:** root `README.md` doesn't mention the webapp anywhere (not in Getting Started, not in Repository Structure) — someone reading only the root README wouldn't know it exists
+- [ ] **Not done:** no smoke test / notebook for the webapp backend (every other component in this project has one)
 
 ---
 
 ## 6. Prompts & Documentation (split across the 4 roles)
 
 - [x] `prompts/` folder + Prompt Disclosure mapping — `ORCH` — [Code/6. Prompts & Documentation/](../Code/6.%20Prompts%20%26%20Documentation/) has all 3 prompts; each node's `.py` docstring names its own prompt file
-- [x] Root `README.md` kept in sync — `UI`
+- [x] Root `README.md` kept in sync for §1-5's original scope — `UI` — **stale for §5.4:** doesn't mention the webapp (see 5.4)
 - [x] `.env.example` kept in sync — `UI`, populated by whoever adds a dependency
 - [x] Data write-up — `DATA` — [data_schema_and_licensing.md](data_schema_and_licensing.md)
 - [x] Graph design write-up — `ORCH` — README's Architecture section + [graph_state_flow.mermaid](../Architecture/graph_state_flow.mermaid)
@@ -223,9 +240,9 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 ### Final — Week 10
 - [ ] Live demo ≤7 min — out of scope here, owned by Frontend/UI Engineer (per team structure)
 - [x] Clean repository — all code committed, no dead files, docs trimmed for conciseness
-- [ ] Comprehensive README — install + run are covered; no troubleshooting section yet
+- [ ] Comprehensive README — install + run covered for the Streamlit path; no troubleshooting section; webapp isn't documented at all (see 5.4)
 - [x] `prompts/` folder complete — all 3 prompts, each with real few-shot examples, mapped to their nodes
-- [ ] Performance & reliability report — §4.3 not started (needs the UI to measure real latency against)
+- [ ] Performance & reliability report — §4.3's numbers are real and measured now, but the write-up file (`performance_reliability_report.md`) hasn't been written yet
 - [ ] Presentation slides — out of scope here, owned by Frontend/UI Engineer (per team structure)
 - [x] Safety notes documented — refusal behavior (router.py), domain allowlist/robots.txt/ToS stance (MCP README)
 

@@ -13,11 +13,11 @@ webapp/
 
 ## Run
 
-Two processes, from the repo root:
+Two processes, from the repo root (same `pip install -r requirements.txt` as the root README's Getting Started — no separate virtualenv):
 
 ```bash
-# 1. Backend (port 8500) — reuses the project's .venv
-.venv/bin/uvicorn main:app --app-dir webapp/backend --port 8500
+# 1. Backend (port 8500)
+uvicorn main:app --app-dir webapp/backend --port 8500
 
 # 2. Frontend dev server (port 5173, proxies /api/* to the backend)
 cd webapp/frontend && npm install && npm run dev
