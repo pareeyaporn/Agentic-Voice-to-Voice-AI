@@ -168,7 +168,7 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 - [x] Measured end-to-end latency for real, per graph node — [4.3 performance and reliability.ipynb](../Code/4.%20Speech%20%28ASR%20%2B%20TTS%29/4.3%20performance%20and%20reliability.ipynb): 2 representative queries, full ASR→graph→TTS pipeline, totals **17.16s** and **12.56s** (retriever is the largest single slice, 3.3-6.6s)
 - [x] Timeouts added on every real network call, previously all on the SDKs' own generous defaults (OpenAI's is 600s): `providers.py` (LLM calls, 30s), `tts.py` (OpenAI TTS, 30s), `web_search_tool.py` (Tavily, 15s, found necessary because `tavily-python`'s own default is 60s x 3 retries = 180s worst case), plus a 120s defense-in-depth outer bound in `async_runtime.run_async()` for the UI. `app.py` catches `TimeoutError` specifically with a clear user-facing message rather than a generic error
 - [x] Stress test: 6 back-to-back real `graph.ainvoke()` calls (incl. one exact repeat) in 38.93s — confirms the persistent MCP session survives back-to-back load (1 session object reused across all 6 calls) and Tavily's 120s cache actually engages on the repeat (8.46s → 5.35s). 5/6 queries logged a `rag.search` error; verified for real (not assumed) — all 5 are the known, documented "category filter not applied" warning (§2.4: `category_top` is constant within `products_home_kitchen`), not genuine failures
-- [ ] Write-up not yet created: notebook's intro references `Project Overview/performance_reliability_report.md`, which doesn't exist yet
+- [x] **Fixed:** write-up now exists — [performance_reliability_report.md](performance_reliability_report.md), pulling the real numbers above straight from the notebook (nothing estimated)
 
 ---
 
@@ -176,7 +176,7 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 
 ### 5.1 Scaffold — `CP1`
 - [x] Streamlit app ([app.py](../Code/5.%20User%20Interface/app.py)): mic recording (`streamlit-mic-recorder`, confirmed with user) + file upload + type-text, 3 input paths
-- [x] Mock-data mode (sidebar toggle, default ON) — 3 canned examples at $0 cost, also serves as a demo-mode fallback
+- [x] Mock-data mode (sidebar toggle, default ON) — 4 canned examples at $0 cost, also serves as a demo-mode fallback (budget search, current-price search, safety-flag refusal, and — **added, closing a gap found during §5.4 review:** the original 3 never exercised a26be22's out_of_scope short-circuit — a 4th example now does)
 - [x] **Fixed a real architecture risk:** `asyncio.run()` per Streamlit rerun would've silently broken §2.4's persistent MCP session (new event loop each time). Fixed with [async_runtime.py](../Code/5.%20User%20Interface/async_runtime.py) — one background event-loop thread for the process's life; verified the same `ClientSession` is reused across reruns, 2nd call ~3x faster
 - [x] **Fixed:** §2's and §4's `config.py` shared the same bare module name — importing both in one process would silently collide. Renamed §4's to `speech_config.py`
 
@@ -198,17 +198,19 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 - [x] `webapp/backend/main.py` — FastAPI thin HTTP layer over the same `graph.py`/`asr.py`/`tts.py` modules; streams the agent step log as NDJSON per node; endpoints for transcribe/query/tts/config/prompt-log
 - [x] `webapp/frontend/` — React (Vite): audio-reactive orb as the primary control (tap to speak), hands-free full voice-to-voice loop, streamed step log, comparison table, citations, dark mode
 - [x] Shared mock-data/step-summary logic factored out into `Code/5. User Interface/ui_common.py`, used by both UIs — Streamlit stays the reference UI, this is an alternative, not a replacement
-- [ ] **Not done: `requirements.txt` was never updated for this.** `webapp/backend/main.py` imports `fastapi`, which isn't installed in this project's environment at all (`uvicorn`/`python-multipart` happen to already be present as transitive deps, but aren't declared either) — following `requirements.txt` alone, the backend can't start
-- [ ] **Not done: `webapp/README.md`'s run instructions reference `.venv/bin/uvicorn`**, but no `.venv` exists anywhere in this repo (the rest of the project just uses `pip install -r requirements.txt` directly) — inconsistent with how everything else here is set up
-- [ ] **Not done:** root `README.md` doesn't mention the webapp anywhere (not in Getting Started, not in Repository Structure) — someone reading only the root README wouldn't know it exists
-- [ ] **Not done:** no smoke test / notebook for the webapp backend (every other component in this project has one)
+- [x] **Fixed:** `fastapi==0.141.1`, `uvicorn==0.52.3`, and `python-multipart==0.0.32` are now declared in [requirements.txt](../requirements.txt) — verified for real: `webapp/backend/main.py` imports cleanly and a `TestClient` round trip against `/api/config` + all 4 mock `/api/query` examples returns 200s, under this project's actual environment (all three versions install and match exactly)
+- [x] **Fixed:** [webapp/README.md](../webapp/README.md)'s run instructions now match how the rest of the project runs things — plain `uvicorn main:app --app-dir webapp/backend --port 8500` against whatever environment you `pip install -r requirements.txt` into, no `.venv` reference
+- [x] **Fixed:** root [README.md](../README.md) now covers the webapp — an "Alternative UI" line in Getting Started, plus a `webapp/` entry in Repository Structure
+- [x] **Fixed:** real smoke test added — [5.4 webapp backend smoke test.ipynb](../Code/5.%20User%20Interface/5.4%20webapp%20backend%20smoke%20test.ipynb), FastAPI `TestClient` against the real route handlers (not mocked HTTP): config/prompt-log, all 4 mock examples + the unknown-query error case, a real `/api/transcribe` round trip, a real end-to-end `/api/query` (mock=false), and a real `/api/tts` call plus its empty-text 503 case
+- [x] **Fixed (found by the smoke test notebook, §5.4 review):** `mcp_client.get_session()` had no lock — safe under Streamlit's one-query-at-a-time background loop, but a real race under FastAPI's concurrent requests (two simultaneous first queries could each spawn their own MCP server subprocess, the second silently orphaning the first). Guarded with an `asyncio.Lock` in `mcp_client.py`; double-checked so every call after the first stays as cheap as before
+- [ ] **Known, not fixed — flagged for a scoping decision:** `providers.LLM_CALL_LOG` is one process-global list with no per-session scoping, and `GET /api/prompt-log` exposes it directly — any client sees every LLM call the backend process has ever made, across all users/tabs. Low-stakes for a local single-user demo (same data Streamlit already shows in its own sidebar), but a real cross-session leak in the API surface once this backend is shared beyond one person's own machine
 
 ---
 
 ## 6. Prompts & Documentation (split across the 4 roles)
 
 - [x] `prompts/` folder + Prompt Disclosure mapping — `ORCH` — [Code/6. Prompts & Documentation/](../Code/6.%20Prompts%20%26%20Documentation/) has all 3 prompts; each node's `.py` docstring names its own prompt file
-- [x] Root `README.md` kept in sync for §1-5's original scope — `UI` — **stale for §5.4:** doesn't mention the webapp (see 5.4)
+- [x] Root `README.md` kept in sync for §1-5's original scope — `UI` — **now also covers §5.4:** Getting Started + Repository Structure both mention the webapp (see 5.4)
 - [x] `.env.example` kept in sync — `UI`, populated by whoever adds a dependency
 - [x] Data write-up — `DATA` — [data_schema_and_licensing.md](data_schema_and_licensing.md)
 - [x] Graph design write-up — `ORCH` — README's Architecture section + [graph_state_flow.mermaid](../Architecture/graph_state_flow.mermaid)
@@ -240,9 +242,9 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 ### Final — Week 10
 - [ ] Live demo ≤7 min — out of scope here, owned by Frontend/UI Engineer (per team structure)
 - [x] Clean repository — all code committed, no dead files, docs trimmed for conciseness
-- [ ] Comprehensive README — install + run covered for the Streamlit path; no troubleshooting section; webapp isn't documented at all (see 5.4)
+- [ ] Comprehensive README — install + run now covered for both the Streamlit path and the webapp (see 5.4); still no troubleshooting section
 - [x] `prompts/` folder complete — all 3 prompts, each with real few-shot examples, mapped to their nodes
-- [ ] Performance & reliability report — §4.3's numbers are real and measured now, but the write-up file (`performance_reliability_report.md`) hasn't been written yet
+- [x] **Fixed:** Performance & reliability report — [performance_reliability_report.md](../Project%20Overview/performance_reliability_report.md) now written, real numbers pulled straight from §4.3's notebook
 - [ ] Presentation slides — out of scope here, owned by Frontend/UI Engineer (per team structure)
 - [x] Safety notes documented — refusal behavior (router.py), domain allowlist/robots.txt/ToS stance (MCP README)
 

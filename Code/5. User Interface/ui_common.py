@@ -97,6 +97,24 @@ MOCK_EXAMPLES = {
                           "I'm happy to help you find some instead."),
         "errors": [],
     },
+    # Demonstrates the out_of_scope short-circuit added in a26be22 (§2.2's
+    # closed "known gap") -- distinct from the safety_flag example above:
+    # no safety_flag here, intent alone routes to out_of_scope_node, not
+    # safe_refusal_node. Query and routing mirror router_system_prompt.md's
+    # own worked example.
+    "what's the weather like today": {
+        "step_log": [
+            ("router", "Extracted query: \"weather today\" | intent: out_of_scope | "
+                        "constraints: {} | safety_flag: None"),
+            ("out_of_scope", "Not a shopping request -- routed to a polite redirect, "
+                              "retrieval skipped entirely"),
+        ],
+        "products": [],
+        "citations": [],
+        "final_answer": ("I'm a shopping assistant, so that's outside what I can help with -- "
+                          "but I'd be happy to find or compare products for you."),
+        "errors": [],
+    },
 }
 
 

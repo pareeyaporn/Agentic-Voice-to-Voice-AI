@@ -6,8 +6,21 @@ after, on the same session.
 
 Uses AsyncExitStack (stdlib) to hold the stdio_client + ClientSession async
 context managers open beyond a single `async with` block.
+
+**Concurrency:** `get_session()` is guarded by `_session_lock` (§5.4 finding).
+Under Streamlit's single-background-loop bridge (`async_runtime.py`) only one
+query ever ran at a time, so the original bare `if _session is None` check
+was safe. The React+FastAPI webapp (§5.4) serves concurrent requests on one
+event loop, and without a lock, two `/api/query` calls landing before the
+first session finishes initializing would each see `_session is None`, each
+spawn their own MCP server subprocess, and the second assignment would
+silently orphan the first (leaked subprocess, and a session swapped out from
+under a call still using it). The lock only serializes session *creation*;
+already-established sessions still serve concurrent `call_tool()`s same as
+before.
 """
 
+import asyncio
 import json
 import os
 import re
@@ -23,6 +36,7 @@ MCP_SERVER_PATH = os.path.join(MODULE_DIR, "..", "3. MCP Server & Tools", "mcp_s
 
 _exit_stack: Optional[AsyncExitStack] = None
 _session: Optional[ClientSession] = None
+_session_lock = asyncio.Lock()
 
 _ERROR_TYPE_RE = re.compile(r"\[(\w+)\]")
 
@@ -40,20 +54,31 @@ class ToolCallError(Exception):
 
 async def get_session() -> ClientSession:
     """Starts the server subprocess + session on first call, reuses it on
-    every call after. Not re-spawned per query."""
+    every call after. Not re-spawned per query.
+
+    Double-checked locking around `_session_lock`: the fast path (session
+    already exists) never awaits the lock, so this stays as cheap as the
+    original unguarded check for every call after the first. Only concurrent
+    *first* calls (the actual race, §5.4) serialize on it -- the second
+    caller through the lock re-checks `_session` and reuses what the first
+    just built instead of spawning a second subprocess."""
     global _exit_stack, _session
     if _session is not None:
         return _session
 
-    stack = AsyncExitStack()
-    params = StdioServerParameters(command=sys.executable, args=[MCP_SERVER_PATH])
-    read, write = await stack.enter_async_context(stdio_client(params))
-    session = await stack.enter_async_context(ClientSession(read, write))
-    await session.initialize()
+    async with _session_lock:
+        if _session is not None:  # re-check inside the lock -- lost the race, reuse the winner's session
+            return _session
 
-    _exit_stack = stack
-    _session = session
-    return session
+        stack = AsyncExitStack()
+        params = StdioServerParameters(command=sys.executable, args=[MCP_SERVER_PATH])
+        read, write = await stack.enter_async_context(stdio_client(params))
+        session = await stack.enter_async_context(ClientSession(read, write))
+        await session.initialize()
+
+        _exit_stack = stack
+        _session = session
+        return session
 
 
 async def close() -> None:
