@@ -200,8 +200,15 @@ export default function App() {
   // Follow-up suggestions -- VUI guidance: every answer should hint at the
   // next step. Each chip is a standalone query (the pipeline is single-turn).
   // Real mode only: mock mode can only replay its canned examples.
-  const followUps = !mock && result && result.products?.length && lastQuery
-    ? [`cheapest ${lastQuery}`, `what's the current price of ${lastQuery}`]
+  // Templates onto result.query (the Router's cleaned-up search query, e.g.
+  // "lunch box under $15"), not lastQuery (the raw transcript) -- templating
+  // onto a full spoken sentence produced broken chips like "cheapest Can you
+  // help me find a lunch box under $15?" (found via real UI testing).
+  // Falls back to lastQuery only if the backend didn't send one (e.g. an
+  // older cached response shape).
+  const followUpBase = result?.query || lastQuery
+  const followUps = !mock && result && result.products?.length && followUpBase
+    ? [`cheapest ${followUpBase}`, `what's the current price of ${followUpBase}`]
     : []
 
   const answerWords = result?.final_answer ? result.final_answer.split(/\s+/) : []

@@ -115,13 +115,20 @@ def transcribe(file: UploadFile) -> dict:
     return {"text": result.text, "language": result.language}
 
 
-def _final_payload(products, citations, final_answer, errors) -> dict:
+def _final_payload(products, citations, final_answer, errors, query) -> dict:
+    # `query` is the Router's rewritten, cleaned-up search query (state["query"],
+    # §2.2) -- not the raw transcript the user typed/spoke. The frontend's
+    # follow-up chips template onto this; templating onto the raw transcript
+    # instead produced broken chips like "cheapest Can you help me find a
+    # lunch box under $15?" for any full-sentence query (found via real UI
+    # testing, not a mocked case).
     return {
         "type": "final",
         "products": products,
         "citations": citations,
         "final_answer": final_answer,
         "errors": errors,
+        "query": query,
     }
 
 
@@ -134,8 +141,10 @@ async def _stream_mock(query: str):
     for node_name, summary in example["step_log"]:
         yield json.dumps({"type": "step", "node": node_name, "summary": summary}) + "\n"
         await asyncio.sleep(MOCK_STEP_DELAY_SECONDS)
+    # Mock examples don't store a separately-cleaned query -- their dict key
+    # already reads as a short phrase, so it doubles as one here.
     yield json.dumps(_final_payload(
-        example["products"], example["citations"], example["final_answer"], example["errors"]
+        example["products"], example["citations"], example["final_answer"], example["errors"], query
     )) + "\n"
 
 
@@ -158,6 +167,7 @@ async def _stream_real(query: str):
         final_state["citations"],
         final_state["final_answer"],
         final_state["tool_results"]["errors"],
+        final_state.get("query") or query,  # router-cleaned query; raw transcript as a defensive fallback
     )) + "\n"
 
 
