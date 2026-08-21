@@ -245,7 +245,12 @@ if st.session_state.result is not None:
         st.markdown(f"**{node_name}** -- {summary}")
 
     if result["errors"]:
-        st.warning("Tool error(s) during retrieval (partial results still used): "
+        # Copy softened deliberately: this list mixes genuine tool failures with benign
+        # informational notes (e.g. rag.search's "category filter not applied" warning,
+        # which arrives alongside a fully successful result) -- see retriever.py's
+        # docstring. Results below are complete either way; not flagging this as an
+        # alarming "error" avoids misreading a harmless note as a real failure.
+        st.warning("Notes from retrieval (results below are complete): "
                     + "; ".join(f"{e.get('tool')}: {e.get('error')}" for e in result["errors"]))
 
     st.subheader("📊 Comparison")

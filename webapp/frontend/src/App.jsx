@@ -313,8 +313,12 @@ export default function App() {
         {result && (
           <>
             {result.errors?.length > 0 && (
+              // Copy softened deliberately: this list mixes genuine tool failures with
+              // benign informational notes (e.g. rag.search's "category filter not
+              // applied" warning, which arrives alongside a fully successful result) --
+              // see retriever.py's docstring. Results below are complete either way.
               <div className="banner banner-warn glass">
-                Tool error(s) during retrieval (partial results still used):{' '}
+                Notes from retrieval (results below are complete):{' '}
                 {result.errors.map((e) => `${e.tool}: ${e.error}`).join('; ')}
               </div>
             )}

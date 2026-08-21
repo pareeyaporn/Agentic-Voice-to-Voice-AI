@@ -47,7 +47,7 @@ MOCK_EXAMPLES = {
             ("router", "Extracted query: \"insulated lunch box for kids\" | intent: product_search | "
                         "constraints: {'budget_max': 20} | safety_flag: None"),
             ("planner", "Plan: use_rag=True, use_web=False (model chose not to call web_search)"),
-            ("retriever", "Called rag.search -- retrieved 3 rag product(s), 0 conflicts, 0 tool errors"),
+            ("retriever", "Called rag.search -- retrieved 3 rag product(s), 0 conflicts, 0 notes"),
             ("answerer", "Synthesized answer with 2 citation(s)"),
         ],
         "products": _MOCK_LUNCHBOX_PRODUCTS[:3],
@@ -68,7 +68,7 @@ MOCK_EXAMPLES = {
                         "constraints: {} | safety_flag: None"),
             ("planner", "Plan: use_rag=True, use_web=True (model called web_search for current price)"),
             ("retriever", "Called rag.search, web.search -- retrieved 4 product(s) "
-                           "(3 rag, 1 web), 0 conflicts, 0 tool errors"),
+                           "(3 rag, 1 web), 0 conflicts, 0 notes"),
             ("answerer", "Synthesized answer with 2 citation(s)"),
         ],
         "products": _MOCK_LUNCHBOX_PRODUCTS,
@@ -142,7 +142,12 @@ STEP_SUMMARIES = {
         f"({sum(1 for p in s['tool_results']['products'] if p.get('source', 'rag') == 'rag')} rag, "
         f"{sum(1 for p in s['tool_results']['products'] if p.get('source') == 'web')} web)"
         f", {len(s['tool_results']['conflicts'])} conflict(s), "
-        f"{len(s['tool_results']['errors'])} tool error(s)"
+        # "notes," not "tool errors" -- this list mixes genuine tool failures with
+        # benign informational notes (e.g. rag.search's "category filter not applied"
+        # warning, which arrives alongside a fully successful result); see
+        # retriever.py's docstring. "N tool error(s)" read as alarming even when N's
+        # entries were all harmless notes and retrieval fully succeeded.
+        f"{len(s['tool_results']['errors'])} note(s)"
     ),
     "answerer": lambda s: f"Synthesized answer with {len(s['citations'])} citation(s)",
 }

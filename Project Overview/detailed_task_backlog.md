@@ -223,7 +223,7 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 ## 7. Milestone Deliverables Checklist
 
 ### Checkpoint 1 — Week 6
-- [ ] One-page proposal (problem, data slice, tools) — a literal course-submission document, not built here
+- [x] One-page proposal (problem, data slice, tools) — [project_proposal.md](project_proposal.md)
 - [x] Data exploration notebook — [1.1 explore data.ipynb](../Code/1.%20Data%20Pipeline%20&%20Indexing/1.1%20explore%20data.ipynb)
 - [ ] Related-work summary — a literal course-submission document, not built here
 - [x] Indexed vector DB — `chroma_db_home_kitchen/`, committed
@@ -242,7 +242,7 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 ### Final — Week 10
 - [ ] Live demo ≤7 min — out of scope here, owned by Frontend/UI Engineer (per team structure)
 - [x] Clean repository — all code committed, no dead files, docs trimmed for conciseness
-- [ ] Comprehensive README — install + run now covered for both the Streamlit path and the webapp (see 5.4); still no troubleshooting section
+- [x] **Fixed:** Comprehensive README — install + run covered for both the Streamlit path and the webapp (see 5.4); troubleshooting section added, 12 real issues hit during this project (wrong Python interpreter, webapp import errors, mock-mode-hides-mic confusion, the category-filter warning, first-query slowness, the async timeout backstop, the anyio cleanup RuntimeError, the OpenMP segfault, missing-key errors, orphaned MCP subprocesses), not a generic checklist
 - [x] `prompts/` folder complete — all 3 prompts, each with real few-shot examples, mapped to their nodes
 - [x] **Fixed:** Performance & reliability report — [performance_reliability_report.md](../Project%20Overview/performance_reliability_report.md) now written, real numbers pulled straight from §4.3's notebook
 - [ ] Presentation slides — out of scope here, owned by Frontend/UI Engineer (per team structure)
