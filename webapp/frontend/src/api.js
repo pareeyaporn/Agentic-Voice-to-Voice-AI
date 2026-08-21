@@ -26,11 +26,20 @@ export async function transcribeAudio(blob, filename) {
 
 // Streams NDJSON events from POST /api/query, invoking onEvent per line as
 // each arrives -- this is what makes the step log render live.
-export async function streamQuery(query, mock, onEvent) {
+// lastTurn ({query, answer} or null): small memory feature -- only the
+// immediately preceding turn, held client-side in App.jsx's own history
+// state (never localStorage), sent back explicitly since the backend is
+// otherwise stateless per-request. Ignored server-side in mock mode.
+export async function streamQuery(query, mock, lastTurn, onEvent) {
   const res = await fetch('/api/query', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, mock }),
+    body: JSON.stringify({
+      query,
+      mock,
+      last_query: lastTurn?.query ?? null,
+      last_answer: lastTurn?.answer ?? null,
+    }),
   })
   if (!res.ok || !res.body) throw new Error(`query failed: ${res.status}`)
 

@@ -58,12 +58,18 @@ def _get_router_llm():
     return _router_llm
 
 
-def classify_transcript(transcript: str) -> RouterOutput:
-    return invoke_and_log(_get_router_llm(), "router", ROUTER_SYSTEM_PROMPT, transcript)
+def classify_transcript(transcript: str, context_note: Optional[str] = None) -> RouterOutput:
+    """context_note (small memory feature, see state.py's docstring): the
+    previous turn's query+answer, if any -- prepended so the Router can
+    resolve a vague follow-up ("what about something cheaper") against real
+    prior context instead of guessing. None on a session's first turn, same
+    as today's behavior."""
+    human_content = f"{context_note}\n\nNew request: {transcript}" if context_note else transcript
+    return invoke_and_log(_get_router_llm(), "router", ROUTER_SYSTEM_PROMPT, human_content)
 
 
 def router_node(state: GraphState) -> GraphState:
-    result = classify_transcript(state["transcript"])
+    result = classify_transcript(state["transcript"], state.get("context_note"))
     state["intent"] = result.intent
     state["query"] = result.query
     state["constraints"] = result.constraints.model_dump(exclude_none=True)

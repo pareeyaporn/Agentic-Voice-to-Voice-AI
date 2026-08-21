@@ -55,7 +55,7 @@ except ImportError:
 
 # Mock data (§5.1) + step summaries live in ui_common.py -- shared with the
 # React+FastAPI webapp (webapp/backend), one source of truth for both UIs.
-from ui_common import MOCK_EXAMPLES, STEP_SUMMARIES  # noqa: E402
+from ui_common import MOCK_EXAMPLES, STEP_SUMMARIES, build_context_note  # noqa: E402
 
 
 # --- Session state defaults --------------------------------------------------------
@@ -65,18 +65,21 @@ for _key, _default in {
     "tts_audio": None,
     "tts_audio_for": None,
     "tts_error": None,
+    "last_query": None,   # small memory feature (see ui_common.build_context_note) --
+    "last_answer": None,  # only the immediately preceding real-mode turn, in-memory only
 }.items():
     if _key not in st.session_state:
         st.session_state[_key] = _default
 
 
 # --- Helpers -------------------------------------------------------------------------
-async def _run_graph_streamed(query: str):
+async def _run_graph_streamed(query: str, context_note: str | None):
     """Runs the real graph via astream() (verified directly to work with the
     persistent MCP session -- see async_runtime.py) so the step log reflects
     what each node actually did, not just the final state."""
     state = dict(EMPTY_STATE)
     state["transcript"] = query
+    state["context_note"] = context_note
     step_log = []
     final_state = state
     async for chunk in graph_mod.graph.astream(state, stream_mode="updates"):
@@ -101,11 +104,12 @@ def run_query(query: str, mock: bool) -> None:
             "step_log": example["step_log"],
         }
     else:
+        context_note = build_context_note(st.session_state.last_query, st.session_state.last_answer)
         with st.spinner("Running Router -> Planner -> Retriever -> Answerer "
                          "(first query of the session also spawns the MCP server "
                          "and loads the local embedding model -- slower once, fast after)..."):
             try:
-                final_state, step_log = async_runtime.run_async(_run_graph_streamed(query))
+                final_state, step_log = async_runtime.run_async(_run_graph_streamed(query, context_note))
             except TimeoutError:
                 st.error(f"This is taking longer than expected (>{async_runtime.DEFAULT_TIMEOUT_SECONDS}s) "
                          "and may have stalled -- try again, or try a simpler query.")
@@ -120,6 +124,11 @@ def run_query(query: str, mock: bool) -> None:
             "errors": final_state["tool_results"]["errors"],
             "step_log": step_log,
         }
+        # Small memory feature: remember only this turn for the *next* one --
+        # not appended to a growing history, deliberately scoped to one prior turn.
+        if final_state["final_answer"]:
+            st.session_state.last_query = query
+            st.session_state.last_answer = final_state["final_answer"]
     st.session_state.tts_audio = None  # stale -- new answer, old audio no longer matches
     st.session_state.tts_audio_for = None
     st.session_state.tts_error = None

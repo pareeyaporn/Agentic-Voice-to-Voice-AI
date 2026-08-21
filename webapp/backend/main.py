@@ -37,7 +37,7 @@ import mcp_client  # noqa: E402
 import providers  # noqa: E402  -- LLM_CALL_LOG, for the Prompt Disclosure panel
 import speech_config  # noqa: E402
 from state import EMPTY_STATE  # noqa: E402
-from ui_common import MOCK_EXAMPLES, STEP_SUMMARIES  # noqa: E402
+from ui_common import MOCK_EXAMPLES, STEP_SUMMARIES, build_context_note  # noqa: E402
 
 import asr  # noqa: E402
 import tts  # noqa: E402
@@ -65,6 +65,11 @@ async def _shutdown() -> None:
 class QueryRequest(BaseModel):
     query: str
     mock: bool = True
+    # Small memory feature (see ui_common.build_context_note): the client holds
+    # its own last-turn state (React's `history`) and sends it back explicitly --
+    # the backend is otherwise stateless per-request, no server-side session.
+    last_query: str | None = None
+    last_answer: str | None = None
 
 
 class TTSRequest(BaseModel):
@@ -148,9 +153,10 @@ async def _stream_mock(query: str):
     )) + "\n"
 
 
-async def _stream_real(query: str):
+async def _stream_real(query: str, context_note: str | None):
     state = dict(EMPTY_STATE)
     state["transcript"] = query
+    state["context_note"] = context_note
     final_state = state
     try:
         async for chunk in graph_mod.graph.astream(state, stream_mode="updates"):
@@ -173,7 +179,11 @@ async def _stream_real(query: str):
 
 @app.post("/api/query")
 async def run_query(req: QueryRequest) -> StreamingResponse:
-    stream = _stream_mock(req.query) if req.mock else _stream_real(req.query.strip())
+    if req.mock:
+        stream = _stream_mock(req.query)
+    else:
+        context_note = build_context_note(req.last_query, req.last_answer)
+        stream = _stream_real(req.query.strip(), context_note)
     return StreamingResponse(stream, media_type="application/x-ndjson")
 
 

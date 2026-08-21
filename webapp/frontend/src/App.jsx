@@ -104,8 +104,11 @@ export default function App() {
     setTtsError(null)
     setLastQuery(q)
     let finalAnswer = null
+    // Small memory feature: only the immediately preceding turn, captured before
+    // this turn appends its own -- not the full history. See api.js's streamQuery().
+    const lastTurn = history.length ? history[history.length - 1] : null
     try {
-      await streamQuery(q, mock, (event) => {
+      await streamQuery(q, mock, lastTurn, (event) => {
         if (event.type === 'step') {
           setSteps((prev) => [...prev, event])
           setStageMsg(STAGE_MESSAGES[event.node] ?? null)

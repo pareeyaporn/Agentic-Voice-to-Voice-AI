@@ -7,6 +7,22 @@ both frontends' backends instead of copy-pasted.
 Nothing here touches Streamlit/FastAPI -- pure data + formatting lambdas.
 """
 
+from typing import Optional
+
+
+def build_context_note(last_query: Optional[str], last_answer: Optional[str]) -> Optional[str]:
+    """Small, deliberately scoped memory feature: carries only the immediately
+    preceding turn forward (not a full conversation history), so the Router
+    can resolve a vague follow-up ("what about something cheaper") against
+    real prior context instead of running standalone -- see state.py's
+    docstring. Both UIs hold last_query/last_answer in their own in-memory
+    session state (never localStorage -- lost on refresh, deliberately) and
+    call this before starting a real graph run. None on a session's first
+    turn or in mock mode, which never calls the real graph at all."""
+    if not last_query or not last_answer:
+        return None
+    return f'Previous request: "{last_query}". Previous answer: "{last_answer}"'
+
 # --- Mock data (§5.1) ---------------------------------------------------------------
 # Rag entries are real product records pulled from search() ($0 cost). The one web
 # entry is synthetic, labeled MOCK.
