@@ -6,45 +6,38 @@ Built for ADSP 32028 — Applied Generative AI: Agents and Multimodal Intelligen
 
 ## Getting Started
 
-**Prerequisites:** Python 3.11+, an OpenAI API key (LLM + TTS), a Tavily API key (web search, free tier).
+**Prerequisites:** Python 3.11+, Node/npm, an OpenAI API key (LLM + TTS), a Tavily API key (web search, free tier).
 
 ```bash
 pip install -r requirements.txt
 cp .env.example .env   # fill in OPENAI_API_KEY, TAVILY_API_KEY, LLM_MODEL
-streamlit run "Code/5. User Interface/app.py"
+
+# Terminal 1 -- backend (port 8500)
+uvicorn main:app --app-dir webapp/backend --port 8500
+
+# Terminal 2 -- frontend (port 5173, proxies /api/* to the backend)
+cd webapp/frontend && npm install && npm run dev
 ```
 
-Opens at `http://localhost:8501`. Mock-data mode is on by default ($0 cost) — toggle it off in the sidebar to run the real pipeline. The MCP server starts automatically; nothing else to run.
+Opens at `http://localhost:5173`. Mock-data mode is on by default ($0 cost) — toggle it off in Settings to run the real pipeline. The MCP server starts automatically; nothing else to run. See [webapp/README.md](webapp/README.md) for more detail.
 
 The vector index is already committed, so no rebuild is needed. To rebuild, run notebooks `1.1` → `1.2` → `1.3`.
 
-**Alternative UI:** a React + FastAPI webapp (`webapp/`) is also available -- same pipeline, voice-first layout. See [webapp/README.md](webapp/README.md) to run it. Streamlit stays the reference UI; either one satisfies the project's UI deliverable.
+**Alternative UI:** a Streamlit app (`Code/5. User Interface/app.py`) is also available -- same pipeline, single-process setup, no separate frontend build:
+```bash
+streamlit run "Code/5. User Interface/app.py"
+```
+Opens at `http://localhost:8501`. Either UI satisfies the project's UI deliverable.
 
 ## Troubleshooting
 
-Real issues hit while building/running this project, not a generic checklist.
+**`ModuleNotFoundError` for a package in `requirements.txt`** -- usually the wrong Python interpreter (multiple Pythons installed). Check `which python3` before reinstalling.
 
-**`ModuleNotFoundError` for a package that's in `requirements.txt`** -- almost always the wrong Python interpreter, not a missing install. If your system has more than one Python (e.g. a system `/usr/bin/python3` alongside a `conda`/`pyenv`/virtualenv one), `pip install -r requirements.txt` and the command you're running (`streamlit run`, `uvicorn`, `python`) can silently point at different interpreters. Check with `which python3` (or `which python`) before reinstalling anything -- it's usually already installed, just in a different environment than the one that's running.
+**No mic/upload button in the React UI** -- expected while Mock-data mode is on (the default); toggle it off in Settings.
 
-**The webapp backend won't start (`ModuleNotFoundError: mcp` or similar)** -- same root cause as above: `main.py` imports `graph.py` → `retriever.py` → `mcp_client.py`, which needs the `mcp` package at import time, not lazily. Confirm the interpreter running `uvicorn` has every package in `requirements.txt` installed, not just the webapp-specific ones (`fastapi`/`uvicorn`/`python-multipart`).
+**"Tool error(s)... category filter not applied"** -- expected, not a bug. `category_top` is constant across the demo slice, so it can't narrow anything; see §2.4 in the task backlog.
 
-**React webapp: no mic button or file-upload button visible** -- expected while "🧪 Mock-data mode" is on (the default). Both are intentionally hidden in mock mode, since there's nothing real to record into. Toggle mock mode off in the ⋯ settings panel.
-
-**`webapp/frontend` won't start** -- run `npm install` first; `node_modules/` isn't committed. Requires Node/npm (any reasonably recent version).
-
-**"Tool error(s) during retrieval... category filter not applied"** -- expected, not a bug. `products_home_kitchen`'s `category_top` is constant across the whole 706-row demo slice (it's the field used to carve the slice out), so filtering by it there can't narrow anything. Shows up whenever a query's wording makes the Router extract a `category` constraint. Restarting won't change it -- see §2.4/§3.2 in the task backlog for the full explanation.
-
-**First real query is much slower than the rest** -- expected. The first call in a fresh process pays for the MCP server subprocess spawning, the local embedding model loading, and (if it's the very first ASR call ever on this machine) `faster-whisper` downloading its model (up to a few minutes, one time only). Every call after reuses the same warm session/model and is much faster.
-
-**"This is taking longer than expected (>120s)"** -- the async bridge's outer timeout tripped. Every real network call already has its own tighter timeout (30s for LLM calls, 15s for Tavily), so 120s is a backstop for something not respecting its own bound, not the normal case. Retry, or try a simpler query; if it happens repeatedly, check your network connection or API key validity first.
-
-**`RuntimeError` printed on shutdown, mentioning anyio/cancel scope** -- cosmetic, not a crash. `mcp_client.close()`'s cleanup is best-effort (anyio ties a session's task group to whichever task opened it, and LangGraph runs nodes in its own task) -- caught and logged, doesn't affect correctness. The server subprocess still exits with the parent process either way.
-
-**Segfault or crash rebuilding the vector index (`1.3 build index.ipynb`)** -- a known PyTorch/scikit-learn OpenMP conflict on some platforms. Set `OMP_NUM_THREADS=1` and `KMP_DUPLICATE_LIB_OK=TRUE` before running the notebook if you hit this.
-
-**Missing API key errors** -- both `require_llm_config()`/`require_tts_config()` (and Tavily's client) raise a clear `RuntimeError`/typed error naming exactly which env var is missing, rather than failing generically. Mock-data mode needs no `.env` at all; copy `.env.example` to `.env` and fill in the named key once you turn mock mode off.
-
-**Leftover `mcp_server.py` process after a crash** -- the MCP server is a subprocess of whatever process spawned it (Streamlit, the FastAPI backend, or a notebook); it should die with its parent, but if something crashed uncleanly, find and stop it with `ps aux | grep mcp_server` / `kill <pid>`.
+**Missing API key errors** -- copy `.env.example` to `.env` and fill in the named key; mock mode needs none at all.
 
 ## Architecture
 
@@ -143,7 +136,7 @@ Project/
 │   ├── 5. User Interface/               # Streamlit app.py
 │   └── 6. Prompts & Documentation/      # system prompts
 ├── Data/                 # Raw Kaggle download (see Data/README.md)
-├── Project Overview/     # Proposal, team structure, task backlog, data schema, RAG eval plan
+├── Project Overview/     # Proposal, related work, team structure, task backlog, data schema, RAG eval plan
 ├── webapp/               # Alternative UI: React + FastAPI (see webapp/README.md)
 ├── requirements.txt
 ├── .env.example
@@ -165,11 +158,11 @@ Each numbered `Code/` folder has its own README or module docstrings for detail.
 
 ## Milestones
 
-| Checkpoint | Week | Deliverable |
+| Checkpoint | Week | Deliverables |
 |---|---|---|
-| Checkpoint 1 | 6 | Proposal, data slice, ingestion notebook |
-| Checkpoint 2 | 8 | Architecture diagram, UI integration, RAG eval, MCP README |
-| Final | 10 | Live demo (≤7 min), clean repo, presentation |
+| Checkpoint 1 | 6 | ✅ [One-page proposal](Project%20Overview/project_proposal.md) · ✅ [Data slice](Project%20Overview/data_schema_and_licensing.md) · ✅ [Ingestion notebook](Code/1.%20Data%20Pipeline%20%26%20Indexing/1.1%20explore%20data.ipynb) · ✅ [Related work](Project%20Overview/related_work_summary.md) |
+| Checkpoint 2 | 8 | ✅ [Architecture diagram](Architecture/architecture_with_mcp.mermaid) (graph + MCP calls) · ✅ UI ([Streamlit](Code/5.%20User%20Interface/app.py) / [React](webapp/)) · ✅ [RAG eval plan](Project%20Overview/rag_eval_plan.md) · ✅ [MCP README](Code/3.%20MCP%20Server%20%26%20Tools/README.md) (schemas) |
+| Final | 10 | ✅ Live demo (≤7 min) · ✅ Clean repo + this README · ✅ Build scripts ([index](Code/1.%20Data%20Pipeline%20%26%20Indexing/1.3%20build%20index.ipynb), [MCP server](Code/3.%20MCP%20Server%20%26%20Tools/mcp_server.py)) · ✅ Presentation |
 
 ## Status
 

@@ -61,9 +61,10 @@ actually landed in practice — whoever builds a section is who ends up document
 - Create comparison table (products, price, brand, source)
 - Polish UI/UX (loading states, error messages, responsive design)
 - Own root README.md, `.env.example`/setup instructions, demo script + presentation slides, dry-run coordination
+- **Added, not in the original plan:** a React + FastAPI alternative UI (`webapp/`) — voice-first tappable orb, hands-free voice-to-voice loop, streamed step log. Streamlit remains the reference UI; the React app became the primary UI for the recorded live demo
 
 **Timeline:** Week 1-10 (scaffold → integrate → polish)  
-**Deliverables:** app.py (Streamlit), README.md, demo script, slides.pdf, usability test notes
+**Deliverables:** app.py (Streamlit), webapp/ (React + FastAPI), README.md, demo script, slides.pdf, usability test notes
 
 ---
 

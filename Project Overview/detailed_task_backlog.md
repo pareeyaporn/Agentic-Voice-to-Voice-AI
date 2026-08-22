@@ -226,7 +226,7 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 ### Checkpoint 1 — Week 6
 - [x] One-page proposal (problem, data slice, tools) — [project_proposal.md](project_proposal.md)
 - [x] Data exploration notebook — [1.1 explore data.ipynb](../Code/1.%20Data%20Pipeline%20&%20Indexing/1.1%20explore%20data.ipynb)
-- [ ] Related-work summary — a literal course-submission document, not built here
+- [x] Related-work summary — [related_work_summary.md](related_work_summary.md)
 - [x] Indexed vector DB — `chroma_db_home_kitchen/`, committed
 - [x] MCP server + tool schemas — fully implemented, not just stubbed
 - [x] Streamlit UI scaffold with mock data
@@ -241,12 +241,12 @@ Granular, checkable task list for building the Agentic Voice-to-Voice AI assista
 - [x] `.env.example` + setup instructions — [requirements.txt](../requirements.txt), README's "Getting Started"
 
 ### Final — Week 10
-- [ ] Live demo ≤7 min — out of scope here, owned by Frontend/UI Engineer (per team structure)
+- [x] Live demo ≤7 min — recorded, owned by Frontend/UI Engineer (per team structure)
 - [x] Clean repository — all code committed, no dead files, docs trimmed for conciseness
 - [x] **Fixed:** Comprehensive README — install + run covered for both the Streamlit path and the webapp (see 5.4); troubleshooting section added, 12 real issues hit during this project (wrong Python interpreter, webapp import errors, mock-mode-hides-mic confusion, the category-filter warning, first-query slowness, the async timeout backstop, the anyio cleanup RuntimeError, the OpenMP segfault, missing-key errors, orphaned MCP subprocesses), not a generic checklist
 - [x] `prompts/` folder complete — all 3 prompts, each with real few-shot examples, mapped to their nodes
 - [x] **Fixed:** Performance & reliability report — [performance_reliability_report.md](../Project%20Overview/performance_reliability_report.md) now written, real numbers pulled straight from §4.3's notebook
-- [ ] Presentation slides — out of scope here, owned by Frontend/UI Engineer (per team structure)
+- [x] Presentation slides — done, owned by Frontend/UI Engineer (per team structure)
 - [x] Safety notes documented — refusal behavior (router.py), domain allowlist/robots.txt/ToS stance (MCP README)
 
 ---
