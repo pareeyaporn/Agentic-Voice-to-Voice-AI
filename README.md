@@ -110,6 +110,20 @@ See also [architecture_comparison.mermaid](Architecture/architecture_comparison.
 | **UI** | Streamlit (reference) — mic input, step log, comparison table, citations, Play-TTS. React + FastAPI (alternative) — voice-first orb, hands-free loop |
 | **LLM** | Model-agnostic via env config (OpenAI, Anthropic, Gemini, Bedrock, open-weight) |
 
+## Prompt Disclosure
+
+Per the charter's requirement — a `prompts/` folder (or README section) containing the main system prompts, tool-call instructions, planner rubric, and any few-shot examples, showing how prompts map to nodes/tools:
+
+| Requirement | Present | Where |
+|---|---|---|
+| Main system prompts | ✅ | [Code/6. Prompts & Documentation/](Code/6.%20Prompts%20%26%20Documentation/) — Router, Planner, Answerer/Critic |
+| Tool-call instructions | ✅ | [planner_system_prompt.md](Code/6.%20Prompts%20%26%20Documentation/planner_system_prompt.md)'s "Call `web_search` when" / "Don't call it when" |
+| Planner rubric | ✅ | Same file — that call/don't-call split *is* the rubric |
+| Few-shot examples | ✅ | Every prompt file has an `## Examples` section (Router: 5 cases · Planner: 4 · Answerer: 2 fully worked) |
+| Prompts mapped to nodes/tools | ✅ | Each prompt file states which node uses it (`**Used by:**`); each node's `.py` docstring names its own prompt file right back |
+
+At runtime, every real LLM call (system prompt + input + output) is also logged live — visible in-app via each UI's "Prompt Disclosure" panel (`providers.py`'s `LLM_CALL_LOG`, `/api/prompt-log` in the webapp).
+
 ## Data
 
 **[Amazon Product Dataset 2020](https://www.kaggle.com/datasets/promptcloud/amazon-product-dataset-2020)** (Kaggle, CC0). 10,002 products, 28 columns — but no rating/review/ingredients data, and `Brand Name`/`Asin`/`Sku` are 100% empty. Demo category: **`Home & Kitchen`** (706 rows, mostly kids' bedding/furniture/party supplies, not cookware).
@@ -160,7 +174,3 @@ Each numbered `Code/` folder has its own README or module docstrings for detail.
 ## Status
 
 🚧 §1-5 (Data, Orchestration, MCP, Speech, UI) implemented and tested, including performance/reliability (see [performance_reliability_report.md](Project%20Overview/performance_reliability_report.md)). Remaining: usability testing with real external users (needs people outside the team).
-
-## License
-
-TBD.
