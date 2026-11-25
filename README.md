@@ -2,6 +2,14 @@
 
 A voice-to-voice, multi-agent shopping assistant: speak a product request, and the system interprets intent, retrieves from a private catalog (with optional live web comparison), and replies by voice with cited sources.
 
+![Voice agent demo: pick a request, watch the agents plan, search and answer with a comparison table and citations](docs/images/voice-agent-demo.gif)
+
+| Agents at work | Live web comparison | Safety guardrail |
+|---|---|---|
+| ![Router, planner and retriever steps streaming live](docs/images/02-agent-working.png) | ![Catalog and live web results side by side](docs/images/04-live-web-comparison.png) | ![Unsafe request caught by the router and refused](docs/images/05-safety-refusal.png) |
+
+*Recorded in mock-data mode (no API keys, $0). The real pipeline runs the same graph with live LLM, web search and TTS.*
+
 Built for ADSP 32028 — Applied Generative AI: Agents and Multimodal Intelligence.
 
 ## Getting Started
